@@ -20,8 +20,8 @@ import streamlit.components.v1 as components
 
 # Configuration de la page
 st.set_page_config(
-    page_title="Gestion des Ivoiriens Résidents en Sibérie",
-    page_icon="📊",
+    page_title="Recensement des Ivoiriens Résidents en Sibérie",
+    page_icon="🇨🇮",
     layout="wide"
 )
 
@@ -401,7 +401,7 @@ def show_statistics(df):
     }), use_container_width=True)
 
 def main():
-    st.markdown('<div class="main-title">GESTION DES IVOIRIENS RÉSIDENTS EN SIBÉRIE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">RECENSEMENT DES IVOIRIENS RÉSIDENTS EN SIBÉRIE</div>', unsafe_allow_html=True)
     
     # Initialisation de la session
     if 'last_update' not in st.session_state:
