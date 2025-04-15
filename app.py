@@ -114,9 +114,9 @@ def normalize_genre(genre):
     if pd.isna(genre):
         return 'Autre'
     genre = str(genre).upper()
-    if 'HOMME' in genre or 'MALE' in genre or 'M' in genre:
+    if 'HOMME' in genre or 'MALE' in genre or 'M' in genre or 'H' in genre:
         return 'Homme'
-    elif 'FEMME' in genre or 'FEMALE' in genre or 'F' in genre:
+    elif 'FEMME' in genre or 'FEMALE' in genre or 'F' in genre or 'WOMAN' in genre or 'W' in genre:
         return 'Femme'
     else:
         return 'Autre'
