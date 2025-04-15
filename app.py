@@ -29,10 +29,9 @@ st.set_page_config(
 @st.cache_resource
 def init_supabase():
     try:
-        return create_client(
-            supabase_url=st.secrets["SUPABASE_URL"],
-            supabase_key=st.secrets["SUPABASE_KEY"]
-        )
+        supabase_url = st.secrets["SUPABASE_URL"]
+        supabase_key = st.secrets["SUPABASE_KEY"]
+        return create_client(supabase_url, supabase_key)
     except Exception as e:
         st.error(f"Erreur d'initialisation de Supabase: {str(e)}")
         return None
