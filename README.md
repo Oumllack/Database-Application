@@ -1,56 +1,74 @@
-# Gestion des Étudiants Ivoiriens en Sibérie
+# Database Management System for Ivorian Students in Siberia
 
-Application web de gestion des étudiants ivoiriens résidant en Sibérie, développée avec Streamlit.
+A comprehensive web application built with Streamlit for managing and tracking Ivorian students residing in Siberia. This system provides an efficient way to maintain student records, visualize data through interactive dashboards, and automatically synchronize with Google Sheets.
 
-## Fonctionnalités
+## Key Features
 
-- Visualisation des données des étudiants
-- Filtrage et recherche avancée
-- Statistiques et graphiques
-- Synchronisation automatique avec Google Sheets
-- Gestion des étudiants (ajout, modification, suppression)
+- 📊 Real-time data visualization with interactive charts and statistics
+- 🔍 Advanced filtering and search capabilities
+- 📱 Responsive and user-friendly interface
+- 🔄 Automatic synchronization with Google Sheets
+- 📈 Student management (add, edit, delete records)
+- 🎯 Data analysis and reporting tools
 
-## Installation
+## Tech Stack
 
-1. Cloner le repository :
-```bash
-git clone https://github.com/votre-nom/gestion-etudiants-siberie.git
-cd gestion-etudiants-siberie
+- Frontend: Streamlit
+- Backend: Python
+- Database: MySQL
+- Data Visualization: Plotly
+- Cloud Integration: Google Sheets API
+
+## Project Structure
+
+```
+Database-App/
+├── app.py                 # Main application file
+├── requirements.txt       # Python dependencies
+├── .streamlit/
+│   ├── config.toml       # Streamlit configuration
+│   └── secrets.toml      # Environment variables (to be created)
+├── README.md             # Project documentation
+└── .gitignore           # Git ignore file
 ```
 
-2. Installer les dépendances :
+## Getting Started
+
+1. Clone the repository:
+```bash
+git clone https://github.com/Oumllack/Database-App.git
+cd Database-App
+```
+
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Configurer les variables d'environnement :
-- Créer un fichier `.streamlit/secrets.toml` avec les informations de connexion à la base de données :
+3. Configure environment variables:
+- Create `.streamlit/secrets.toml` with your database credentials:
 ```toml
 [mysql]
-host = "votre-hôte"
-user = "votre-utilisateur"
-password = "votre-mot-de-passe"
+host = "your-host"
+user = "your-username"
+password = "your-password"
 database = "cirt_db"
 ```
 
-4. Lancer l'application :
+4. Run the application:
 ```bash
 streamlit run app.py
 ```
 
-## Configuration Google Sheets
+## Google Sheets Integration
 
-1. Créer un fichier `sheet_id.txt` contenant l'ID de votre feuille Google Sheets
-2. Configurer les autorisations Google Sheets dans le fichier `credentials.json`
+1. Create a `sheet_id.txt` file containing your Google Sheets ID
+2. Configure Google Sheets API credentials in `credentials.json`
 
-## Structure du Projet
+## License
 
-- `app.py` : Application principale
-- `requirements.txt` : Dépendances Python
-- `.streamlit/config.toml` : Configuration Streamlit
-- `.streamlit/secrets.toml` : Variables d'environnement (à créer)
-- `sheet_id.txt` : ID de la feuille Google Sheets (à créer)
+This project is licensed under the MIT License.
 
-## Licence
+## Contact
 
-Ce projet est sous licence MIT. 
+For any questions or support, please open an issue in the repository. 
