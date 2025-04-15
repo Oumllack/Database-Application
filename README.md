@@ -1,4 +1,4 @@
-# Database Management System for Ivorian Students in Siberia
+# Database Management System 
 
 A comprehensive web application built with Streamlit for managing and tracking Ivorian students residing in Siberia. This system provides an efficient way to maintain student records, visualize data through interactive dashboards, and automatically synchronize with Google Sheets.
 
