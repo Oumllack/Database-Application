@@ -101,10 +101,12 @@ def create_metric_card(title, value):
 
 def connect_to_database():
     try:
-        supabase: Client = create_client(
-            st.secrets["supabase_url"],
-            st.secrets["supabase_key"]
-        )
+        # URL et clé API Supabase directement dans le code
+        supabase_url = "https://ookqqfxklaucvfvlbmge.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9va3FxZnhrbGF1Y3ZmdmxibWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MTg1NzQsImV4cCI6MjA2MDI5NDU3NH0.M5iHbjRcnyFY_8qAOg8my6aD3qO85IJEV8FPa4CUiaY"
+        
+        # Création du client Supabase
+        supabase: Client = create_client(supabase_url, supabase_key)
         return supabase
     except Exception as e:
         st.error(f"Erreur de connexion à la base de données: {str(e)}")
@@ -190,8 +192,18 @@ def clean_data(df):
 
 def load_from_google_sheets():
     try:
-        # Lire les credentials depuis les secrets Streamlit
-        credentials_dict = json.loads(st.secrets["google_credentials"])
+        # Credentials Google directement dans le code
+        credentials_dict = {
+            "installed": {
+                "client_id": "57333174304-i63u32onhn0nfa55mkq2eouoj3n1ls6a.apps.googleusercontent.com",
+                "project_id": "cirt-ivoiriens-siberie",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_secret": "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",
+                "redirect_uris": ["http://localhost"]
+            }
+        }
         
         flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_config(
             credentials_dict,
