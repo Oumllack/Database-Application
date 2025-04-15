@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 from dotenv import load_dotenv
 import google.oauth2.credentials
@@ -405,7 +405,7 @@ def main():
     
     # Initialisation de la session
     if 'last_update' not in st.session_state:
-        st.session_state.last_update = datetime.now()
+        st.session_state.last_update = datetime.now(timezone(timedelta(hours=7)))  # UTC+7 pour Tomsk
         st.session_state.data = None
     
     # Fonction pour charger les données
@@ -418,7 +418,7 @@ def main():
                     df = pd.DataFrame(response.data)
                     df = clean_data(df)
                     st.session_state.data = df
-                    st.session_state.last_update = datetime.now()
+                    st.session_state.last_update = datetime.now(timezone(timedelta(hours=7)))  # UTC+7 pour Tomsk
                 except Exception as e:
                     st.error(f"Erreur lors de la récupération des données: {e}")
     
@@ -437,7 +437,8 @@ def main():
         st.success("Données actualisées avec succès !")
     
     # Affichage du dernier refresh
-    st.sidebar.markdown(f"*Dernière actualisation*:  \n{st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')}")
+    tomsk_time = st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')
+    st.sidebar.markdown(f"*Dernière actualisation (heure de Tomsk)*:  \n{tomsk_time}")
     
     if menu == "Visualiser les données":
         if st.session_state.data is not None:
