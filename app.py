@@ -102,8 +102,8 @@ def create_metric_card(title, value):
 def connect_to_database():
     try:
         supabase: Client = create_client(
-            st.secrets["supabase"]["url"],
-            st.secrets["supabase"]["key"]
+            st.secrets["supabase_url"],
+            st.secrets["supabase_key"]
         )
         return supabase
     except Exception as e:
@@ -190,8 +190,8 @@ def clean_data(df):
 
 def load_from_google_sheets():
     try:
-        with open('credentials.json', 'r') as f:
-            credentials_dict = json.load(f)
+        # Lire les credentials depuis les secrets Streamlit
+        credentials_dict = json.loads(st.secrets["google_credentials"])
         
         flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_config(
             credentials_dict,
