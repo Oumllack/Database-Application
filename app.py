@@ -1,16 +1,22 @@
 import streamlit as st
 import pandas as pd
-import mysql.connector
 import plotly.express as px
 import plotly.graph_objects as go
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
+from dotenv import load_dotenv
+import google.oauth2.credentials
+import google_auth_oauthlib.flow
+import googleapiclient.discovery
+from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import pickle
 import json
+from supabase import create_client, Client
+import numpy as np
+import altair as alt
+from streamlit_extras.stylable_container import stylable_container
+from streamlit_extras.switch_page_button import switch_page
+import streamlit.components.v1 as components
 
 # Configuration de la page
 st.set_page_config(
@@ -45,6 +51,24 @@ st.markdown("""
         color: #2980B9;
         font-weight: bold;
     }
+    .metric-card {
+        background-color: #FFFFFF;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .metric-value {
+        font-size: 2.5em;
+        font-weight: bold;
+        color: #2C3E50;
+        margin: 10px 0;
+    }
+    .metric-label {
+        font-size: 1.1em;
+        color: #7F8C8D;
+    }
     .dataframe {
         font-size: 1.1em;
     }
@@ -67,126 +91,224 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Fonction pour se connecter à la base de données
+def create_metric_card(title, value):
+    st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">{title}</div>
+            <div class="metric-value">{value}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
 def connect_to_database():
     try:
-        conn = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="",
-            database="cirt_db"
+        supabase: Client = create_client(
+            st.secrets["supabase"]["url"],
+            st.secrets["supabase"]["key"]
         )
-        return conn
-    except mysql.connector.Error as err:
-        st.error(f"Erreur de connexion à la base de données: {err}")
+        return supabase
+    except Exception as e:
+        st.error(f"Erreur de connexion à la base de données: {str(e)}")
         return None
 
-# Fonction pour normaliser le genre
 def normalize_genre(genre):
     if pd.isna(genre):
         return 'Autre'
-    genre = str(genre).strip().upper()
-    if genre in ['M', 'HOMME', 'H', 'MALE']:
+    genre = str(genre).upper()
+    if 'HOMME' in genre or 'MALE' in genre or 'M' in genre:
         return 'Homme'
-    elif genre in ['F', 'FEMME', 'FEMALE']:
+    elif 'FEMME' in genre or 'FEMALE' in genre or 'F' in genre:
         return 'Femme'
     else:
         return 'Autre'
 
-# Fonction pour charger depuis Google Sheets
-def load_from_google_sheets(sheet_id):
+def abbreviate_university(name):
+    if pd.isna(name) or name == "":
+        return "Inconnu"
+    abbreviations = {
+        "Université Polytechnique de Tomsk": "ТПУ",
+        "Université d'Etat de Tomsk": "ТГУ",
+        "Université d'Etat de Tomsk des Systemes de Controle et de Radioelectronique": "ТУСУР",
+        "Université d'Etat de Tomsk des Systèmes de Contrôle et de Radioélectronique": "ТУСУР",
+        "Université Médicale d'Etat de Sibérie": "СибГМУ",
+        "Université d'Etat d'Architecture et de Construction de Tomsk": "ТГАСУ",
+        "Université Médicale d'Etat de Kemerovo": "КемГМУ",
+        "Universite d'Etat de Tomsk": "ТГУ",
+        "Université d'État de Tomsk": "ТГУ",
+        "Université médicale d'Etat de Sibérie": "СибГМУ",
+        "Université d'Etat architecture construction Tomsk": "ТГАСУ",
+        "Tomsk State University": "ТГУ",
+        "Siberian State Medical University": "СибГМУ",
+        "Tomsk State University of Control Systems and Radioelectronics": "ТУСУР"
+    }
+    name = str(name).strip()
+    for full_name, abbrev in abbreviations.items():
+        if full_name.lower() == name.lower():
+            return abbrev
+    return name
+
+def clean_data(df):
+    """Nettoie et uniformise toutes les données"""
+    # Nettoyage des villes
+    if 'ville' in df.columns:
+        df['ville'] = df['ville'].astype(str).str.strip().str.title()
+        city_mapping = {
+            'Tomsk': 'Tomsk',
+            'Tomks': 'Tomsk',
+            'Tomsk ': 'Tomsk',
+            'Tomsk City': 'Tomsk',
+            'Tomskaya Oblast': 'Tomsk',
+            'Kemerovo': 'Kemerovo',
+            'Kemerovo ': 'Kemerovo',
+            'Kemerovo City': 'Kemerovo',
+            'Томск': 'Tomsk',
+            'Kemerovskaya Oblast': 'Kemerovo'
+        }
+        df['ville'] = df['ville'].replace(city_mapping)
+        # Standardisation finale - tout ce qui contient 'Tomsk' devient 'Tomsk'
+        df.loc[df['ville'].str.contains('Tomsk', case=False, na=False), 'ville'] = 'Tomsk'
+        df.loc[df['ville'].str.contains('Kemerovo', case=False, na=False), 'ville'] = 'Kemerovo'
+    
+    # Nettoyage des niveaux d'étude
+    if 'niveau_etude' in df.columns:
+        df['niveau_etude'] = df['niveau_etude'].astype(str).str.strip()
+        niveau_mapping = {
+            'Master': 'Master',
+            'Master ': 'Master',
+            'Masters': 'Master',
+            'M2': 'Master',
+            'M1': 'Master',
+            'Bachelor': 'Bachelor',
+            'Licence': 'Bachelor',
+            'Doctorat': 'Doctorat',
+            'PhD': 'Doctorat',
+            'Spécialiste': 'Spécialiste',
+            'Année de langue': 'Année de langue'
+        }
+        df['niveau_etude'] = df['niveau_etude'].replace(niveau_mapping)
+    
+    return df
+
+def load_from_google_sheets():
     try:
-        SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-        creds = None
+        with open('credentials.json', 'r') as f:
+            credentials_dict = json.load(f)
         
-        # Le fichier token.json stocke les tokens d'accès et de rafraîchissement de l'utilisateur
-        if os.path.exists('token.json'):
-            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+        flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_config(
+            credentials_dict,
+            scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+        )
         
-        # Si les credentials n'existent pas ou sont invalides, demander à l'utilisateur de se connecter
-        if not creds or not creds.valid:
-            if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            else:
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    'credentials.json', SCOPES)
-                creds = flow.run_local_server(port=0)
-            
-            # Sauvegarder les credentials pour la prochaine fois
-            with open('token.json', 'w') as token:
-                token.write(creds.to_json())
+        credentials = flow.run_local_server(port=0)
+        service = build('sheets', 'v4', credentials=credentials)
+        SPREADSHEET_ID = "11ucmdeReXYeAD4phDTJSyq_5ELnADZlUQpDZhH43Gk8"
         
-        service = build('sheets', 'v4', credentials=creds)
-        sheet = service.spreadsheets()
-        result = sheet.values().get(
-            spreadsheetId=sheet_id,
-            range='A1:Z1000'  # Ajustez selon vos besoins
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range='A:J'
         ).execute()
         
         values = result.get('values', [])
-        if not values:
-            st.error("Aucune donnée trouvée dans la feuille")
-            return None
         
-        # Convertir en DataFrame
+        if not values:
+            st.error("Aucune donnée trouvée dans le Google Sheet.")
+            return None
+            
         df = pd.DataFrame(values[1:], columns=values[0])
+        
+        column_mapping = {
+            "Date": "date_inscription",
+            "Adresse e-mail ": "email",
+            "Nom": "nom_complet",
+            "Genre": "genre",
+            "Université": "universite",
+            "Faculté": "faculte",
+            "Niveau d'étude": "niveau_etude",
+            "Numéro de téléphone ": "telephone",
+            "Adresse de résidence": "adresse",
+            "Ville": "ville"
+        }
+        
+        df = df.rename(columns=column_mapping)
+        df['date_inscription'] = pd.to_datetime(df['date_inscription'], dayfirst=True)
+        df['date_creation'] = datetime.now()
+        df['date_modification'] = datetime.now()
+        df['genre'] = df['genre'].apply(normalize_genre)
+        
+        # Normalisation simple des villes
+        df['ville'] = df['ville'].str.upper().str.strip()
+        df.loc[df['ville'].str.contains('TOMSK', case=False, na=False), 'ville'] = 'TOMSK'
+        
         return df
-    
+        
     except Exception as e:
-        st.error(f"Erreur lors du chargement depuis Google Sheets: {str(e)}")
+        st.error(f"Erreur lors de l'importation depuis Google Sheets: {str(e)}")
         return None
 
-# Fonction pour abréger les noms d'universités
-def abbreviate_university(name):
-    if pd.isna(name):
-        return name
-    abbreviations = {
-        "Université d'Etat de Tomsk des Systemes de Controle et de Radioelectronique": "TUSUR",
-        "Université Polytechnique de Tomsk": "TPU",
-        "Université d'Etat de Tomsk": "TGU",
-        "Université Médicale d'Etat de Sibérie": "SIGMU",
-        "Université Médicale d'Etat de Kemerovo": "KEMSMU",
-        "Université d'Etat d'Architecture et de Construction de Tomsk": "TGASU"
-    }
-    # Vérifier si le nom exact existe dans les abréviations
-    if name in abbreviations:
-        return abbreviations[name]
-    # Vérifier si le nom contient une des clés
-    for key in abbreviations:
-        if key in name:
-            return abbreviations[key]
-    return name
+def update_database(df, conn):
+    try:
+        inserted = 0
+        updated = 0
+        total = len(df)
+        
+        for _, row in df.iterrows():
+            try:
+                response = conn.table('etudiants').select("*").eq("email", row['email']).execute()
+                if response.data:
+                    conn.table('etudiants').update({
+                        "nom_complet": row['nom_complet'],
+                        "genre": row['genre'],
+                        "universite": row['universite'],
+                        "faculte": row['faculte'],
+                        "niveau_etude": row['niveau_etude'],
+                        "telephone": row['telephone'],
+                        "adresse": row['adresse'],
+                        "ville": row['ville'],
+                        "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }).eq("email", row['email']).execute()
+                    updated += 1
+                else:
+                    conn.table('etudiants').insert({
+                        "date_inscription": row['date_inscription'].strftime('%Y-%m-%d'),
+                        "email": row['email'],
+                        "nom_complet": row['nom_complet'],
+                        "genre": row['genre'],
+                        "universite": row['universite'],
+                        "faculte": row['faculte'],
+                        "niveau_etude": row['niveau_etude'],
+                        "telephone": row['telephone'],
+                        "adresse": row['adresse'],
+                        "ville": row['ville'],
+                        "date_creation": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    }).execute()
+                    inserted += 1
+            except Exception as e:
+                st.warning(f"Erreur lors de l'importation de {row['email']}: {str(e)}")
+                continue
+        
+        return inserted, updated, total
+        
+    except Exception as e:
+        st.error(f"Erreur lors de la mise à jour de la base de données: {str(e)}")
+        return 0, 0, 0
 
-# Fonction pour formater les titres
-def format_title(title):
-    return title.replace('_', ' ').upper()
-
-# Fonction pour afficher les statistiques
 def show_statistics(df):
-    # Créer une copie pour les graphiques avec les abréviations
-    df_graph = df.copy()
-    df_graph['universite'] = df_graph['universite'].apply(abbreviate_university)
-    
     st.markdown('<div class="section-title">STATISTIQUES GÉNÉRALES</div>', unsafe_allow_html=True)
     
     # Métriques principales
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown('<div class="metric-title">Nombre total d\'étudiants</div>', unsafe_allow_html=True)
-        st.metric("", len(df))
+        create_metric_card("Nombre total d'étudiants", len(df))
     
     with col2:
-        st.markdown('<div class="metric-title">Nombre d\'hommes</div>', unsafe_allow_html=True)
-        st.metric("", len(df[df['genre'] == 'Homme']))
+        create_metric_card("Nombre d'hommes", len(df[df['genre'] == 'Homme']))
     
     with col3:
-        st.markdown('<div class="metric-title">Nombre de femmes</div>', unsafe_allow_html=True)
-        st.metric("", len(df[df['genre'] == 'Femme']))
+        create_metric_card("Nombre de femmes", len(df[df['genre'] == 'Femme']))
     
     with col4:
-        st.markdown('<div class="metric-title">Nombre d\'universités</div>', unsafe_allow_html=True)
-        st.metric("", df['universite'].nunique())
+        create_metric_card("Nombre d'universités", df['universite'].nunique())
     
     # Graphiques principaux
     col1, col2 = st.columns(2)
@@ -209,17 +331,17 @@ def show_statistics(df):
     
     with col2:
         st.markdown('<div class="section-title">RÉPARTITION PAR NIVEAU D\'ÉTUDE</div>', unsafe_allow_html=True)
-        fig_niveau = px.bar(df['niveau_etude'].value_counts(),
+        niveau_counts = df['niveau_etude'].value_counts().reset_index()
+        niveau_counts.columns = ['niveau_etude', 'count']
+        
+        fig_niveau = px.bar(niveau_counts,
+                          x='niveau_etude',
+                          y='count',
                           color_discrete_sequence=['#7FB3D5'])
         fig_niveau.update_layout(
             title_text='',
-            title_font_size=20,
             xaxis_title='',
-            yaxis_title='',
-            xaxis_title_font_size=16,
-            yaxis_title_font_size=16,
-            xaxis_tickfont_size=14,
-            yaxis_tickfont_size=14,
+            yaxis_title='Nombre d\'étudiants',
             showlegend=False,
             margin=dict(l=20, r=20, t=20, b=20)
         )
@@ -230,19 +352,19 @@ def show_statistics(df):
     
     with col1:
         st.markdown('<div class="section-title">RÉPARTITION PAR UNIVERSITÉ</div>', unsafe_allow_html=True)
-        # Utiliser df_graph pour les abréviations
-        uni_counts = df_graph['universite'].value_counts()
-        fig_uni = px.bar(uni_counts, 
+        df_uni = df.copy()
+        df_uni['universite'] = df_uni['universite'].apply(abbreviate_university)
+        uni_counts = df_uni['universite'].value_counts().reset_index()
+        uni_counts.columns = ['universite', 'count']
+        
+        fig_uni = px.bar(uni_counts,
+                        x='universite',
+                        y='count',
                         color_discrete_sequence=['#7FB3D5'])
         fig_uni.update_layout(
             title_text='',
-            title_font_size=20,
             xaxis_title='',
-            yaxis_title='',
-            xaxis_title_font_size=16,
-            yaxis_title_font_size=16,
-            xaxis_tickfont_size=14,
-            yaxis_tickfont_size=14,
+            yaxis_title='Nombre d\'étudiants',
             showlegend=False,
             margin=dict(l=20, r=20, t=20, b=20)
         )
@@ -280,232 +402,53 @@ def show_statistics(df):
         'Pourcentage d\'hommes': '{:.1f}%',
         'Pourcentage de femmes': '{:.1f}%'
     }), use_container_width=True)
-    
-    # Export des données
-    st.markdown('<div class="section-title">EXPORT DES DONNÉES</div>', unsafe_allow_html=True)
-    if st.button("Exporter les données au format Excel"):
-        excel_file = df.to_excel("etudiants_cirt.xlsx", index=False)
-        with open("etudiants_cirt.xlsx", "rb") as file:
-            st.download_button(
-                label="Télécharger le fichier Excel",
-                data=file,
-                file_name="etudiants_cirt.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-# Fonction pour sauvegarder les modifications
-def save_changes(conn, table_name, operation, data):
-    try:
-        cursor = conn.cursor()
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        
-        # Création de la table d'historique si elle n'existe pas
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS historique_modifications (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                table_name VARCHAR(50),
-                operation VARCHAR(20),
-                data JSON,
-                timestamp DATETIME,
-                user VARCHAR(50)
-            )
-        """)
-        
-        # Insertion de l'historique
-        query = """
-            INSERT INTO historique_modifications 
-            (table_name, operation, data, timestamp, user)
-            VALUES (%s, %s, %s, %s, %s)
-        """
-        values = (table_name, operation, data, timestamp, 'admin')
-        cursor.execute(query, values)
-        conn.commit()
-        
-    except mysql.connector.Error as err:
-        st.error(f"Erreur lors de la sauvegarde de l'historique: {err}")
-    finally:
-        cursor.close()
-
-# Fonction pour synchroniser avec Google Sheets
-def sync_with_google_sheets(sheet_id):
-    try:
-        # Charger les données depuis Google Sheets
-        df_sheets = load_from_google_sheets(sheet_id)
-        if df_sheets is None:
-            return False, "Erreur lors du chargement des données depuis Google Sheets"
-        
-        # Nettoyer les noms de colonnes (supprimer les espaces)
-        df_sheets.columns = [col.strip() for col in df_sheets.columns]
-        
-        # Vérifier les colonnes requises
-        required_columns = ['Date', 'Adresse e-mail', 'Nom', 'Genre', 'Université', 
-                          'Faculté', 'Niveau d\'étude', 'Numéro de téléphone', 
-                          'Adresse de résidence', 'Ville']
-        
-        missing_columns = [col for col in required_columns if col not in df_sheets.columns]
-        if missing_columns:
-            return False, f"Colonnes manquantes dans Google Sheets : {', '.join(missing_columns)}"
-        
-        # Vérifier que les emails sont valides et non vides
-        df_sheets = df_sheets.dropna(subset=['Adresse e-mail'])
-        df_sheets['Adresse e-mail'] = df_sheets['Adresse e-mail'].str.strip()
-        df_sheets = df_sheets[df_sheets['Adresse e-mail'] != '']
-        
-        # Supprimer les doublons basés sur l'email
-        df_sheets = df_sheets.drop_duplicates(subset=['Adresse e-mail'], keep='last')
-        
-        if len(df_sheets) == 0:
-            return False, "Aucun email valide trouvé dans les données"
-        
-        # Normaliser les données
-        df_sheets['Genre'] = df_sheets['Genre'].apply(normalize_genre)
-        
-        # Remplacer les valeurs nulles par des valeurs par défaut
-        df_sheets['Nom'] = df_sheets['Nom'].fillna('Non spécifié')
-        df_sheets['Genre'] = df_sheets['Genre'].fillna('Autre')
-        df_sheets['Université'] = df_sheets['Université'].fillna('Non spécifiée')
-        df_sheets['Faculté'] = df_sheets['Faculté'].fillna('Non spécifiée')
-        df_sheets['Niveau d\'étude'] = df_sheets['Niveau d\'étude'].fillna('Non spécifié')
-        df_sheets['Numéro de téléphone'] = df_sheets['Numéro de téléphone'].fillna('Non spécifié')
-        df_sheets['Adresse de résidence'] = df_sheets['Adresse de résidence'].fillna('Non spécifiée')
-        df_sheets['Ville'] = df_sheets['Ville'].fillna('Non spécifiée')
-        
-        # Se connecter à la base de données
-        conn = connect_to_database()
-        if not conn:
-            return False, "Erreur de connexion à la base de données"
-        
-        cursor = conn.cursor()
-        
-        # Récupérer les données actuelles de la base
-        cursor.execute("SELECT email FROM etudiants")
-        existing_emails = set(row[0] for row in cursor.fetchall())
-        
-        # Traiter chaque ligne
-        new_records = 0
-        updated_records = 0
-        
-        for _, row in df_sheets.iterrows():
-            email = row['Adresse e-mail']
-            if pd.isna(email) or email == '':
-                continue
-                
-            if email in existing_emails:
-                # Mise à jour
-                query = """
-                UPDATE etudiants 
-                SET nom_complet = %s, genre = %s, universite = %s, 
-                    faculte = %s, niveau_etude = %s, telephone = %s, 
-                    adresse = %s, ville = %s, date_modification = %s
-                WHERE email = %s
-                """
-                values = (
-                    row['Nom'], row['Genre'], row['Université'],
-                    row['Faculté'], row['Niveau d\'étude'], row['Numéro de téléphone'],
-                    row['Adresse de résidence'], row['Ville'], datetime.now(), email
-                )
-                cursor.execute(query, values)
-                updated_records += 1
-            else:
-                # Insertion
-                query = """
-                INSERT INTO etudiants 
-                (nom_complet, email, genre, universite, faculte, niveau_etude, 
-                 telephone, adresse, ville, date_inscription, date_modification)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """
-                values = (
-                    row['Nom'], email, row['Genre'], row['Université'],
-                    row['Faculté'], row['Niveau d\'étude'], row['Numéro de téléphone'],
-                    row['Adresse de résidence'], row['Ville'], datetime.now(), datetime.now()
-                )
-                cursor.execute(query, values)
-                new_records += 1
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        return True, f"Synchronisation réussie : {new_records} nouveaux enregistrements, {updated_records} mises à jour"
-    
-    except Exception as e:
-        return False, f"Erreur lors de la synchronisation : {str(e)}"
-
-# Fonction pour la synchronisation automatique
-def auto_sync():
-    try:
-        # Lire l'ID de la feuille depuis un fichier de configuration
-        with open('sheet_id.txt', 'r') as f:
-            sheet_id = f.read().strip()
-        
-        if sheet_id:
-            success, message = sync_with_google_sheets(sheet_id)
-            if success:
-                st.session_state.last_sync_time = datetime.now()
-                st.session_state.last_sync_status = "success"
-                st.session_state.last_sync_message = message
-            else:
-                st.session_state.last_sync_status = "error"
-                st.session_state.last_sync_message = message
-    except FileNotFoundError:
-        st.session_state.last_sync_status = "warning"
-        st.session_state.last_sync_message = "Aucun ID de feuille configuré. Veuillez configurer la synchronisation."
 
 def main():
     st.markdown('<div class="main-title">GESTION DES IVOIRIENS RÉSIDENTS EN SIBÉRIE</div>', unsafe_allow_html=True)
     
-    # Configuration de la synchronisation
-    st.sidebar.markdown('<div class="section-title">SYNCHRONISATION</div>', unsafe_allow_html=True)
+    # Initialisation de la session
+    if 'last_update' not in st.session_state:
+        st.session_state.last_update = datetime.now()
+        st.session_state.data = None
     
-    # Initialisation des variables de session
-    if 'last_sync_time' not in st.session_state:
-        st.session_state.last_sync_time = None
-    if 'last_sync_status' not in st.session_state:
-        st.session_state.last_sync_status = None
-    if 'last_sync_message' not in st.session_state:
-        st.session_state.last_sync_message = None
+    # Fonction pour charger les données
+    def load_data(force=False):
+        if force or st.session_state.data is None:
+            conn = connect_to_database()
+            if conn:
+                try:
+                    response = conn.table('etudiants').select("*").execute()
+                    df = pd.DataFrame(response.data)
+                    df = clean_data(df)
+                    st.session_state.data = df
+                    st.session_state.last_update = datetime.now()
+                except Exception as e:
+                    st.error(f"Erreur lors de la récupération des données: {e}")
     
-    # ID de la feuille par défaut
-    DEFAULT_SHEET_ID = "11ucmdeReXYeAD4phDTJSyq_5ELnADZlUQpDZhH43Gk8"
-    
-    # Configuration initiale
-    if not os.path.exists('sheet_id.txt'):
-        with open('sheet_id.txt', 'w') as f:
-            f.write(DEFAULT_SHEET_ID)
-    
-    # Lire l'ID actuel
-    with open('sheet_id.txt', 'r') as f:
-        current_id = f.read().strip()
-    
-    # Affichage du statut de la dernière synchronisation
-    if st.session_state.last_sync_time:
-        st.sidebar.write(f"Dernière synchronisation : {st.session_state.last_sync_time.strftime('%Y-%m-%d %H:%M:%S')}")
-        if st.session_state.last_sync_status == "success":
-            st.sidebar.success(st.session_state.last_sync_message)
-        elif st.session_state.last_sync_status == "error":
-            st.sidebar.error(st.session_state.last_sync_message)
-        elif st.session_state.last_sync_status == "warning":
-            st.sidebar.warning(st.session_state.last_sync_message)
-    
-    # Bouton de synchronisation manuelle
-    if st.sidebar.button("Synchroniser maintenant"):
-        auto_sync()
-    
-    # Synchronisation automatique toutes les 5 minutes
-    if st.session_state.last_sync_time is None or (datetime.now() - st.session_state.last_sync_time).seconds > 300:
-        auto_sync()
+    # Chargement initial des données
+    load_data()
     
     # Menu latéral
     menu = st.sidebar.selectbox(
         "Menu",
-        ["Visualiser les données", "Ajouter un étudiant", "Modifier/Supprimer"]
+        ["Visualiser les données", "Ajouter un étudiant", "Modifier/Supprimer", "Importation"]
     )
     
+    # Bouton d'actualisation manuelle
+    if st.sidebar.button("🔄 Actualiser maintenant"):
+        load_data(force=True)
+        st.success("Données actualisées avec succès !")
+    
+    # Affichage du dernier refresh
+    st.sidebar.markdown(f"*Dernière actualisation*:  \n{st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')}")
+    
     if menu == "Visualiser les données":
-        conn = connect_to_database()
-        if conn:
-            query = "SELECT * FROM etudiants"
-            df = pd.read_sql(query, conn)
+        if st.session_state.data is not None:
+            df = st.session_state.data
+            
+            if df.empty:
+                st.info("Aucun étudiant n'est encore enregistré dans la base de données.")
+                return
             
             # Filtres avancés
             st.sidebar.markdown('<div class="section-title">FILTRES AVANCÉS</div>', unsafe_allow_html=True)
@@ -603,162 +546,153 @@ def main():
             st.sidebar.markdown('<div class="section-title">RÉSUMÉ DES FILTRES</div>', unsafe_allow_html=True)
             st.sidebar.write(f"Nombre d'étudiants affichés : {len(df_display)}")
             st.sidebar.write(f"Nombre total d'étudiants : {len(df)}")
-            
-            conn.close()
     
     elif menu == "Ajouter un étudiant":
         st.subheader("➕ Ajouter un nouvel étudiant")
         
         with st.form("add_student_form"):
-            nom_complet = st.text_input("Nom complet")
-            email = st.text_input("Email")
-            genre = st.selectbox("Genre", ["Homme", "Femme", "Autre"])
-            universite = st.text_input("Université")
-            faculte = st.text_input("Faculté")
-            niveau_etude = st.selectbox("Niveau d'étude", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
+            nom_complet = st.text_input("Nom complet*")
+            email = st.text_input("Email*")
+            genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"])
+            universite = st.text_input("Université*")
+            faculte = st.text_input("Faculté*")
+            niveau_etude = st.selectbox("Niveau d'étude*", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
             telephone = st.text_input("Téléphone")
             adresse = st.text_input("Adresse")
-            ville = st.text_input("Ville")
+            ville = st.text_input("Ville*")
             
             submitted = st.form_submit_button("Ajouter")
             
             if submitted:
-                conn = connect_to_database()
-                if conn:
-                    cursor = conn.cursor()
-                    try:
-                        query = """
-                        INSERT INTO etudiants 
-                        (nom_complet, email, genre, universite, faculte, niveau_etude, telephone, adresse, ville, date_inscription)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        """
-                        values = (
-                            nom_complet, email, genre, universite, faculte, 
-                            niveau_etude, telephone, adresse, ville, 
-                            datetime.now().strftime('%Y-%m-%d')
-                        )
-                        cursor.execute(query, values)
-                        conn.commit()
-                        
-                        # Sauvegarde de l'historique
-                        data = {
-                            'nom_complet': nom_complet,
-                            'email': email,
-                            'genre': genre,
-                            'universite': universite,
-                            'faculte': faculte,
-                            'niveau_etude': niveau_etude,
-                            'telephone': telephone,
-                            'adresse': adresse,
-                            'ville': ville
-                        }
-                        save_changes(conn, 'etudiants', 'INSERT', str(data))
-                        
-                        st.success("Étudiant ajouté avec succès !")
-                    except mysql.connector.Error as err:
-                        st.error(f"Erreur lors de l'ajout: {err}")
-                    finally:
-                        cursor.close()
-                        conn.close()
+                if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
+                    st.error("Veuillez remplir tous les champs obligatoires (*)")
+                else:
+                    conn = connect_to_database()
+                    if conn:
+                        try:
+                            # Nettoyage des données avant insertion
+                            ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
+                            niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
+                            
+                            response = conn.table('etudiants').insert({
+                                "nom_complet": nom_complet,
+                                "email": email,
+                                "genre": genre,
+                                "universite": universite,
+                                "faculte": faculte,
+                                "niveau_etude": niveau_etude,
+                                "telephone": telephone,
+                                "adresse": adresse,
+                                "ville": ville,
+                                "date_creation": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                "date_inscription": datetime.now().strftime('%Y-%m-%d')
+                            }).execute()
+                            st.success("Étudiant ajouté avec succès !")
+                            load_data(force=True)  # Recharger les données
+                        except Exception as e:
+                            st.error(f"Erreur lors de l'ajout: {e}")
     
     elif menu == "Modifier/Supprimer":
         st.subheader("✏️ Modifier ou Supprimer un étudiant")
         
         conn = connect_to_database()
         if conn:
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT id, nom_complet FROM etudiants")
-            students = cursor.fetchall()
-            
-            student_names = {student['id']: student['nom_complet'] for student in students}
-            selected_id = st.selectbox(
-                "Sélectionner un étudiant",
-                options=list(student_names.keys()),
-                format_func=lambda x: student_names[x]
-            )
-            
-            if selected_id:
-                cursor.execute("SELECT * FROM etudiants WHERE id = %s", (selected_id,))
-                student = cursor.fetchone()
+            try:
+                load_data()  # S'assurer que les données sont à jour
+                df = st.session_state.data
                 
-                action = st.radio(
-                    "Action",
-                    ["Modifier", "Supprimer"]
+                student_names = {idx: row['nom_complet'] for idx, row in df.iterrows()}
+                selected_id = st.selectbox(
+                    "Sélectionner un étudiant",
+                    options=list(student_names.keys()),
+                    format_func=lambda x: student_names[x]
                 )
                 
-                if action == "Modifier":
-                    with st.form("edit_student_form"):
-                        nom_complet = st.text_input("Nom complet", value=student['nom_complet'])
-                        email = st.text_input("Email", value=student['email'])
-                        genre = st.selectbox("Genre", ["Homme", "Femme", "Autre"], index=["Homme", "Femme", "Autre"].index(student['genre']))
-                        universite = st.text_input("Université", value=student['universite'])
-                        faculte = st.text_input("Faculté", value=student['faculte'])
-                        niveau_etude = st.selectbox(
-                            "Niveau d'étude", 
-                            ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"],
-                            index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
-                        )
-                        telephone = st.text_input("Téléphone", value=student['telephone'])
-                        adresse = st.text_input("Adresse", value=student['adresse'])
-                        ville = st.text_input("Ville", value=student['ville'])
-                        
-                        submitted = st.form_submit_button("Mettre à jour")
-                        
-                        if submitted:
+                if selected_id is not None:
+                    student = df.loc[selected_id]
+                    
+                    action = st.radio(
+                        "Action",
+                        ["Modifier", "Supprimer"]
+                    )
+                    
+                    if action == "Modifier":
+                        with st.form("edit_student_form"):
+                            nom_complet = st.text_input("Nom complet*", value=student['nom_complet'])
+                            email = st.text_input("Email*", value=student['email'])
+                            genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"], index=["Homme", "Femme", "Autre"].index(student['genre']))
+                            universite = st.text_input("Université*", value=student['universite'])
+                            faculte = st.text_input("Faculté*", value=student['faculte'])
+                            niveau_etude = st.selectbox(
+                                "Niveau d'étude*", 
+                                ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"],
+                                index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
+                            )
+                            telephone = st.text_input("Téléphone", value=student['telephone'])
+                            adresse = st.text_input("Adresse", value=student['adresse'])
+                            ville = st.text_input("Ville*", value=student['ville'])
+                            
+                            submitted = st.form_submit_button("Mettre à jour")
+                            
+                            if submitted:
+                                if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
+                                    st.error("Veuillez remplir tous les champs obligatoires (*)")
+                                else:
+                                    try:
+                                        # Nettoyage des données avant mise à jour
+                                        ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
+                                        niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
+                                        
+                                        response = conn.table('etudiants').update({
+                                            "nom_complet": nom_complet,
+                                            "email": email,
+                                            "genre": genre,
+                                            "universite": universite,
+                                            "faculte": faculte,
+                                            "niveau_etude": niveau_etude,
+                                            "telephone": telephone,
+                                            "adresse": adresse,
+                                            "ville": ville,
+                                            "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                                        }).eq("email", student['email']).execute()
+                                        st.success("Étudiant mis à jour avec succès !")
+                                        load_data(force=True)  # Recharger les données
+                                    except Exception as e:
+                                        st.error(f"Erreur lors de la mise à jour: {e}")
+                    
+                    else:  # Supprimer
+                        if st.button("Confirmer la suppression"):
                             try:
-                                query = """
-                                UPDATE etudiants 
-                                SET nom_complet = %s, email = %s, genre = %s, universite = %s, 
-                                    faculte = %s, niveau_etude = %s, telephone = %s, 
-                                    adresse = %s, ville = %s, date_modification = %s
-                                WHERE id = %s
-                                """
-                                values = (
-                                    nom_complet, email, genre, universite, faculte,
-                                    niveau_etude, telephone, adresse, ville,
-                                    datetime.now(), selected_id
-                                )
-                                cursor.execute(query, values)
-                                conn.commit()
-                                
-                                # Sauvegarde de l'historique
-                                data = {
-                                    'id': selected_id,
-                                    'nom_complet': nom_complet,
-                                    'email': email,
-                                    'genre': genre,
-                                    'universite': universite,
-                                    'faculte': faculte,
-                                    'niveau_etude': niveau_etude,
-                                    'telephone': telephone,
-                                    'adresse': adresse,
-                                    'ville': ville
-                                }
-                                save_changes(conn, 'etudiants', 'UPDATE', str(data))
-                                
-                                st.success("Étudiant mis à jour avec succès !")
-                            except mysql.connector.Error as err:
-                                st.error(f"Erreur lors de la mise à jour: {err}")
-                
-                else:  # Supprimer
-                    if st.button("Confirmer la suppression"):
-                        try:
-                            # Récupération des données avant suppression
-                            cursor.execute("SELECT * FROM etudiants WHERE id = %s", (selected_id,))
-                            student_data = cursor.fetchone()
-                            
-                            cursor.execute("DELETE FROM etudiants WHERE id = %s", (selected_id,))
-                            conn.commit()
-                            
-                            # Sauvegarde de l'historique
-                            save_changes(conn, 'etudiants', 'DELETE', str(student_data))
-                            
-                            st.success("Étudiant supprimé avec succès !")
-                        except mysql.connector.Error as err:
-                            st.error(f"Erreur lors de la suppression: {err}")
+                                response = conn.table('etudiants').delete().eq("email", student['email']).execute()
+                                st.success("Étudiant supprimé avec succès !")
+                                load_data(force=True)  # Recharger les données
+                            except Exception as e:
+                                st.error(f"Erreur lors de la suppression: {e}")
             
-            cursor.close()
-            conn.close()
+            except Exception as e:
+                st.error(f"Erreur: {e}")
+    
+    elif menu == "Importation":
+        st.subheader("📥 Importation depuis Google Sheets")
+        
+        if st.button("Importer les données"):
+            df = load_from_google_sheets()
+            if df is not None:
+                st.write("Données chargées depuis Google Sheets:")
+                st.dataframe(df)
+                
+                if st.button("Mettre à jour la base de données"):
+                    conn = connect_to_database()
+                    if conn:
+                        inserted, updated, total = update_database(df, conn)
+                        st.success(f"""
+                            Import terminé avec succès:
+                            - {inserted} nouveaux étudiants ajoutés
+                            - {updated} étudiants mis à jour
+                            - {total} lignes traitées au total
+                        """)
+                        load_data(force=True)  # Recharger les données
 
 if __name__ == "__main__":
-    main() 
+    main()

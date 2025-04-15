@@ -1,74 +1,148 @@
-# Database Management System for Ivorian Students in Siberia
+# Gestion des Ivoiriens Résidents en Sibérie
 
-A comprehensive web application built with Streamlit for managing and tracking Ivorian students residing in Siberia. This system provides an efficient way to maintain student records, visualize data through interactive dashboards, and automatically synchronize with Google Sheets.
+Application de gestion des étudiants ivoiriens résidant en Sibérie.
 
-## Key Features
+## Déploiement sur Streamlit Cloud
 
-- 📊 Real-time data visualization with interactive charts and statistics
-- 🔍 Advanced filtering and search capabilities
-- 📱 Responsive and user-friendly interface
-- 🔄 Automatic synchronization with Google Sheets
-- 📈 Student management (add, edit, delete records)
-- 🎯 Data analysis and reporting tools
+1. Créez un compte sur [Streamlit Cloud](https://streamlit.io/cloud)
+2. Connectez votre compte GitHub
+3. Cliquez sur "New app"
+4. Sélectionnez votre dépôt
+5. Dans la section "Main file path", entrez `app.py`
+6. Dans la section "Advanced settings", ajoutez les variables d'environnement suivantes :
+   - `SUPABASE_URL` : L'URL de votre base de données Supabase
+   - `SUPABASE_KEY` : La clé API de votre base de données Supabase
+   - `GOOGLE_SHEETS_ID` : L'ID de votre Google Sheet
+7. Cliquez sur "Deploy"
 
-## Tech Stack
+## Configuration requise
 
-- Frontend: Streamlit
-- Backend: Python
-- Database: MySQL
-- Data Visualization: Plotly
-- Cloud Integration: Google Sheets API
+- Python 3.9+
+- Les dépendances listées dans `requirements.txt`
 
-## Project Structure
+## Variables d'environnement
 
-```
-Database-App/
-├── app.py                 # Main application file
-├── requirements.txt       # Python dependencies
-├── .streamlit/
-│   ├── config.toml       # Streamlit configuration
-│   └── secrets.toml      # Environment variables (to be created)
-├── README.md             # Project documentation
-└── .gitignore           # Git ignore file
+Créez un fichier `.env` à la racine du projet avec les variables suivantes :
+
+```env
+SUPABASE_URL=votre_url_supabase
+SUPABASE_KEY=votre_clé_supabase
+GOOGLE_SHEETS_ID=votre_id_google_sheet
 ```
 
-## Getting Started
+## Installation locale
 
-1. Clone the repository:
+1. Clonez le dépôt
+2. Créez un environnement virtuel : `python -m venv venv`
+3. Activez l'environnement virtuel :
+   - Windows : `venv\Scripts\activate`
+   - MacOS/Linux : `source venv/bin/activate`
+4. Installez les dépendances : `pip install -r requirements.txt`
+5. Lancez l'application : `streamlit run app.py`
+
+## Prérequis
+
+- Python 3.8 ou supérieur
+- MySQL 8.0 ou supérieur (ou service de base de données cloud gratuit)
+- Compte Google pour l'API Sheets
+- Compte Streamlit Cloud
+
+## Installation
+
+1. Clonez le dépôt :
 ```bash
-git clone https://github.com/Oumllack/Database-App.git
-cd Database-App
+git clone [URL_DU_REPO]
+cd [NOM_DU_REPERTOIRE]
 ```
 
-2. Install dependencies:
+2. Créez et activez un environnement virtuel :
+```bash
+python -m venv venv
+source venv/bin/activate  # Sur Windows : venv\Scripts\activate
+```
+
+3. Installez les dépendances :
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Configure environment variables:
-- Create `.streamlit/secrets.toml` with your database credentials:
-```toml
-[mysql]
-host = "your-host"
-user = "your-username"
-password = "your-password"
-database = "cirt_db"
+4. Configuration :
+   - Copiez `.env.example` vers `.env` et remplissez les informations
+   - Pour le développement local, utilisez les paramètres locaux
+   - Pour la production, choisissez un des services gratuits ci-dessous
+
+5. Initialisation de la base de données :
+```bash
+python setup_database.py
 ```
 
-4. Run the application:
+## Déploiement
+
+### 1. Configuration de la base de données
+
+#### Option 1 : Railway.app (Gratuit)
+1. Créez un compte sur [Railway](https://railway.app/)
+2. Créez un nouveau projet
+3. Ajoutez une base de données MySQL
+4. Récupérez les informations de connexion
+5. Mettez à jour le fichier `.env` avec ces informations
+
+#### Option 2 : Supabase (Gratuit)
+1. Créez un compte sur [Supabase](https://supabase.com/)
+2. Créez un nouveau projet
+3. Récupérez les informations de connexion
+4. Mettez à jour le fichier `.env` avec ces informations
+
+#### Option 3 : Clever Cloud (Gratuit)
+1. Créez un compte sur [Clever Cloud](https://www.clever-cloud.com/)
+2. Créez une base de données MySQL
+3. Récupérez les informations de connexion
+4. Mettez à jour le fichier `.env` avec ces informations
+
+### 2. Déploiement sur Streamlit Cloud
+
+1. Créez un compte sur [Streamlit Cloud](https://streamlit.io/cloud)
+2. Connectez votre dépôt GitHub
+3. Dans les paramètres de déploiement :
+   - Ajoutez les secrets suivants :
+     - MYSQL_HOST
+     - MYSQL_USER
+     - MYSQL_PASSWORD
+     - MYSQL_DATABASE
+     - GOOGLE_SHEETS_ID
+   - Configurez la commande de démarrage : `streamlit run app.py`
+
+## Utilisation
+
+1. Lancez l'application localement :
 ```bash
 streamlit run app.py
 ```
 
-## Google Sheets Integration
+2. Accédez à l'application déployée :
+- Local : http://localhost:8501
+- Production : [URL_STREAMLIT_CLOUD]
 
-1. Create a `sheet_id.txt` file containing your Google Sheets ID
-2. Configure Google Sheets API credentials in `credentials.json`
+## Fonctionnalités
 
-## License
+- Visualisation des données
+- Ajout de nouveaux étudiants
+- Modification et suppression d'étudiants
+- Import automatique depuis Google Sheets
+- Statistiques et graphiques
 
-This project is licensed under the MIT License.
+## Structure du projet
 
-## Contact
+```
+.
+├── app.py                  # Application Streamlit
+├── setup_database.py       # Script d'initialisation de la base de données
+├── requirements.txt        # Dépendances Python
+├── .env                    # Variables d'environnement (à créer)
+├── .env.example           # Exemple de variables d'environnement
+└── README.md              # Documentation
+```
 
-For any questions or support, please open an issue in the repository. 
+## Support
+
+Pour toute question ou problème, veuillez ouvrir une issue sur GitHub.

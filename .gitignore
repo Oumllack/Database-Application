@@ -1,17 +1,17 @@
-# Fichiers sensibles
-sheet_id.txt
-credentials.json
-token.json
-
-# Environnements virtuels
+# Environnement virtuel
 venv/
 env/
 .env
 
-# Fichiers systèmes
-.DS_Store
-__pycache__/
-*.pyc
+# Fichiers de configuration sensibles
+.streamlit/secrets.toml
+credentials.json
 
-# Fichiers de configuration locaux
-.streamlit/secrets.toml 
+# Fichiers Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Fichiers de système
+.DS_Store
+Thumbs.db 
