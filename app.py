@@ -128,6 +128,7 @@ def abbreviate_university(name):
         "Université Polytechnique de Tomsk": "ТПУ",
         "Université d'Etat de Tomsk": "ТГУ",
         "Université d'Etat de Tomsk des Systemes de Controle et de Radioelectronique": "ТУСУР",
+        "Université d'Etat de Tomsk des Systèmes de Contrôle et de Radioélectronique": "ТУСУР",
         "Université Médicale d'Etat de Sibérie": "СибГМУ",
         "Université d'Etat d'Architecture et de Construction de Tomsk": "ТГАСУ",
         "Université Médicale d'Etat de Kemerovo": "КемГМУ",
@@ -136,7 +137,8 @@ def abbreviate_university(name):
         "Université médicale d'Etat de Sibérie": "СибГМУ",
         "Université d'Etat architecture construction Tomsk": "ТГАСУ",
         "Tomsk State University": "ТГУ",
-        "Siberian State Medical University": "СибГМУ"
+        "Siberian State Medical University": "СибГМУ",
+        "Tomsk University of Control Systems and Radioelectronics": "ТУСУР"
     }
     name = str(name).strip()
     for full_name, abbrev in abbreviations.items():
