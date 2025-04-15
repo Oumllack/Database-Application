@@ -7,4 +7,6 @@ google-auth-httplib2==0.1.0
 google-api-python-client==2.86.0
 supabase==1.0.3
 numpy==1.23.5
-altair==4.2.2 
+altair==4.2.2
+gspread==5.12.0
+oauth2client==4.1.3 
