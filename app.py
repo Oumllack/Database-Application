@@ -101,10 +101,12 @@ def create_metric_card(title, value):
 
 def connect_to_database():
     try:
-        supabase: Client = create_client(
-            st.secrets["supabase"]["url"],
-            st.secrets["supabase"]["key"]
-        )
+        # URL et clé API Supabase directement dans le code
+        supabase_url = "https://ookqqfxklaucvfvlbmge.supabase.co"
+        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9va3FxZnhrbGF1Y3ZmdmxibWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MTg1NzQsImV4cCI6MjA2MDI5NDU3NH0.M5iHbjRcnyFY_8qAOg8my6aD3qO85IJEV8FPa4CUiaY"
+        
+        # Création du client Supabase
+        supabase: Client = create_client(supabase_url, supabase_key)
         return supabase
     except Exception as e:
         st.error(f"Erreur de connexion à la base de données: {str(e)}")
