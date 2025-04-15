@@ -11,7 +11,7 @@ import googleapiclient.discovery
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import json
-from supabase import create_client
+from supabase import create_client, Client
 import numpy as np
 import altair as alt
 from streamlit_extras.stylable_container import stylable_container
@@ -20,8 +20,8 @@ import streamlit.components.v1 as components
 
 # Configuration de la page
 st.set_page_config(
-    page_title="Recensement des Ivoiriens Résidents en Sibérie",
-    page_icon="🇨🇮",
+    page_title="Gestion des Ivoiriens Résidents en Sibérie",
+    page_icon="📊",
     layout="wide"
 )
 
