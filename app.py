@@ -190,8 +190,13 @@ def clean_data(df):
 
 def load_from_google_sheets():
     try:
-        with open('credentials.json', 'r') as f:
-            credentials_dict = json.load(f)
+        # Essayer de lire le fichier local credentials.json
+        if os.path.exists('credentials.json'):
+            with open('credentials.json', 'r') as f:
+                credentials_dict = json.load(f)
+        else:
+            # Sinon, lire depuis les secrets Streamlit
+            credentials_dict = json.loads(st.secrets["google_credentials"])
         
         flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_config(
             credentials_dict,
