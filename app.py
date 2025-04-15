@@ -31,7 +31,10 @@ def init_supabase():
     try:
         supabase_url = st.secrets["SUPABASE_URL"]
         supabase_key = st.secrets["SUPABASE_KEY"]
-        return create_client(supabase_url, supabase_key)
+        return create_client(supabase_url, supabase_key, {
+            'auto_refresh_token': True,
+            'persist_session': True
+        })
     except Exception as e:
         st.error(f"Erreur d'initialisation de Supabase: {str(e)}")
         return None
