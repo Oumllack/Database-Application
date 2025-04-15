@@ -20,8 +20,8 @@ import streamlit.components.v1 as components
 
 # Configuration de la page
 st.set_page_config(
-    page_title="Gestion des Ivoiriens Résidents en Sibérie",
-    page_icon="📊",
+    page_title="Recensement des Ivoiriens Résidents en Sibérie",
+    page_icon="🇨🇮",
     layout="wide"
 )
 
@@ -254,41 +254,109 @@ def main():
     st.sidebar.markdown(f"*Dernière actualisation*:  \n{st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')}")
     
     if menu == "Visualiser les données":
-        st.subheader("📊 Visualisation des données")
-        
         if st.session_state.data is not None:
-            # Affichage des statistiques
-            show_statistics(st.session_state.data)
+            df = st.session_state.data
+            
+            if df.empty:
+                st.info("Aucun étudiant n'est encore enregistré dans la base de données.")
+                return
+            
+            # Filtres avancés
+            st.sidebar.markdown('<div class="section-title">FILTRES AVANCÉS</div>', unsafe_allow_html=True)
+            
+            # Recherche par nom
+            search_name = st.sidebar.text_input("Rechercher par nom")
+            if search_name:
+                df = df[df['nom_complet'].str.contains(search_name, case=False, na=False)]
             
             # Filtres
-            st.subheader("Filtres")
-            col1, col2 = st.columns(2)
+            genre_filter = st.sidebar.multiselect(
+                "Filtrer par genre",
+                options=df['genre'].unique(),
+                default=df['genre'].unique()
+            )
             
-            with col1:
-                selected_universite = st.multiselect(
-                    "Université",
-                    options=sorted(st.session_state.data['universite'].unique()),
-                    default=[]
-                )
+            uni_filter = st.sidebar.multiselect(
+                "Filtrer par université",
+                options=df['universite'].unique(),
+                default=df['universite'].unique()
+            )
             
-            with col2:
-                selected_ville = st.multiselect(
-                    "Ville",
-                    options=sorted(st.session_state.data['ville'].unique()),
-                    default=[]
-                )
+            niveau_filter = st.sidebar.multiselect(
+                "Filtrer par niveau d'étude",
+                options=df['niveau_etude'].unique(),
+                default=df['niveau_etude'].unique()
+            )
+            
+            ville_filter = st.sidebar.multiselect(
+                "Filtrer par ville",
+                options=df['ville'].unique(),
+                default=df['ville'].unique()
+            )
             
             # Application des filtres
-            filtered_data = st.session_state.data.copy()
-            if selected_universite:
-                filtered_data = filtered_data[filtered_data['universite'].isin(selected_universite)]
-            if selected_ville:
-                filtered_data = filtered_data[filtered_data['ville'].isin(selected_ville)]
+            if genre_filter:
+                df = df[df['genre'].isin(genre_filter)]
+            if uni_filter:
+                df = df[df['universite'].isin(uni_filter)]
+            if niveau_filter:
+                df = df[df['niveau_etude'].isin(niveau_filter)]
+            if ville_filter:
+                df = df[df['ville'].isin(ville_filter)]
             
-            # Affichage des données filtrées
-            st.dataframe(filtered_data)
-        else:
-            st.warning("Aucune donnée disponible. Veuillez actualiser ou importer des données.")
+            # Affichage des statistiques
+            show_statistics(df)
+            
+            # Affichage des données
+            st.markdown('<div class="section-title">LISTE DES ÉTUDIANTS</div>', unsafe_allow_html=True)
+            
+            # Options de tri
+            sort_options = {
+                'nom_complet': 'Nom Complet',
+                'universite': 'Université',
+                'niveau_etude': 'Niveau d\'Étude',
+                'ville': 'Ville',
+                'date_inscription': 'Date'
+            }
+            
+            sort_column = st.selectbox(
+                "Trier par",
+                options=list(sort_options.keys()),
+                format_func=lambda x: sort_options[x]
+            )
+            sort_order = st.radio("Ordre", ["Croissant", "Décroissant"])
+            
+            df_sorted = df.sort_values(
+                by=sort_column,
+                ascending=(sort_order == "Croissant")
+            )
+            
+            # Sélectionner uniquement les colonnes à afficher
+            columns_to_display = [
+                'nom_complet', 'email', 'genre', 'universite', 'faculte', 
+                'niveau_etude', 'telephone', 'adresse', 'ville', 'date_inscription'
+            ]
+            df_display = df_sorted[columns_to_display]
+            
+            # Renommer les colonnes pour l'affichage
+            df_display.columns = [
+                'Nom Complet', 'Email', 'Genre', 'Université', 'Faculté',
+                'Niveau d\'Étude', 'Téléphone', 'Adresse', 'Ville', 'Date'
+            ]
+            
+            st.dataframe(
+                df_display.style.set_properties(**{
+                    'font-size': '1.1em',
+                    'text-align': 'left'
+                }),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # Résumé des filtres
+            st.sidebar.markdown('<div class="section-title">RÉSUMÉ DES FILTRES</div>', unsafe_allow_html=True)
+            st.sidebar.write(f"Nombre d'étudiants affichés : {len(df_display)}")
+            st.sidebar.write(f"Nombre total d'étudiants : {len(df)}")
     
     elif menu == "Ajouter un étudiant":
         st.subheader("➕ Ajouter un nouvel étudiant")
