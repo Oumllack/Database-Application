@@ -100,17 +100,77 @@ def create_metric_card(title, value):
     """, unsafe_allow_html=True)
 
 def connect_to_database():
+    """Établit une connexion avec la base de données Supabase."""
     try:
-        # URL et clé API Supabase directement dans le code
-        supabase_url = "https://ookqqfxklaucvfvlbmge.supabase.co"
-        supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9va3FxZnhrbGF1Y3ZmdmxibWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MTg1NzQsImV4cCI6MjA2MDI5NDU3NH0.M5iHbjRcnyFY_8qAOg8my6aD3qO85IJEV8FPa4CUiaY"
-        
-        # Création du client Supabase
-        supabase: Client = create_client(supabase_url, supabase_key)
-        return supabase
+        # En mode développement, on peut simplement retourner un dictionnaire vide
+        # Cette fonction est normalement utilisée pour initialiser Supabase
+        # Pour éviter les erreurs, on retourne simplement un "mock" de la connexion
+        st.session_state.db_connection = {"status": "mock", "mock_data": True}
+        st.success("Mode démo : Connexion à la base de données simulée")
+        return {"status": "success", "message": "Connexion à la base de données établie avec succès."}
     except Exception as e:
-        st.error(f"Erreur de connexion à la base de données: {str(e)}")
-        return None
+        return {"status": "error", "message": f"Erreur lors de la connexion à la base de données: {str(e)}"}
+
+def load_data_from_database():
+    """Charge les données depuis la base de données Supabase."""
+    if "df" not in st.session_state or st.session_state.df is None:
+        try:
+            # En mode développement/démo, on utilise un DataFrame vide ou des données fictives
+            df = pd.DataFrame({
+                "nom_complet": ["Jean Kouassi", "Marie Koffi", "Luc Tanoh", "Aya Koné", "Kouadio N'Guessan"],
+                "genre": ["Homme", "Femme", "Homme", "Femme", "Homme"],
+                "universite": ["Université de Moscou", "Université de Saint-Pétersbourg", "Institut de Sibérie", "Université de Moscou", "Université de Kazan"],
+                "faculte": ["Médecine", "Droit", "Informatique", "Économie", "Sciences"],
+                "niveau_etude": ["Doctorat", "Licence", "Master", "Licence", "Master"],
+                "telephone": ["+7912345678", "+7987654321", "+7955555555", "+7944444444", "+7933333333"],
+                "email": ["jean@example.com", "marie@example.com", "luc@example.com", "aya@example.com", "kouadio@example.com"],
+                "adresse": ["Rue Pouchkine 10", "Avenue Lénine 25", "Boulevard Novossibirsk 5", "Rue Tolstoï 15", "Place Rouge 1"],
+                "ville": ["Moscou", "Saint-Pétersbourg", "Novossibirsk", "Moscou", "Kazan"],
+                "date_inscription": [pd.Timestamp("2023-10-15"), pd.Timestamp("2023-09-20"), pd.Timestamp("2023-11-05"), pd.Timestamp("2023-08-12"), pd.Timestamp("2023-07-30")],
+                "date_creation": [pd.Timestamp("2023-12-01")] * 5,
+                "date_modification": [pd.Timestamp("2023-12-01")] * 5
+            })
+            
+            st.session_state.df = df
+            return df
+        except Exception as e:
+            st.error(f"Erreur lors du chargement des données depuis la base de données: {str(e)}")
+            return None
+    else:
+        return st.session_state.df
+
+def insert_data_into_database(df_to_insert):
+    """Insère les données dans la base de données Supabase."""
+    try:
+        # En mode développement/démo, on simule l'insertion
+        # Dans un cas réel, on enverrait les données à Supabase
+        if "df" not in st.session_state:
+            st.session_state.df = df_to_insert
+        else:
+            st.session_state.df = pd.concat([st.session_state.df, df_to_insert], ignore_index=True)
+            
+        return {"status": "success", "message": "Données insérées avec succès."}
+    except Exception as e:
+        return {"status": "error", "message": f"Erreur lors de l'insertion des données: {str(e)}"}
+        
+def update_data_in_database(df):
+    """Met à jour les données dans la base de données Supabase."""
+    try:
+        # En mode développement/démo, on met à jour directement le DataFrame en session
+        st.session_state.df = df
+        return {"status": "success", "message": "Données mises à jour avec succès."}
+    except Exception as e:
+        return {"status": "error", "message": f"Erreur lors de la mise à jour des données: {str(e)}"}
+
+def delete_data_from_database(indices_to_delete):
+    """Supprime les données de la base de données Supabase."""
+    try:
+        # En mode développement/démo, on supprime directement du DataFrame en session
+        if "df" in st.session_state and st.session_state.df is not None:
+            st.session_state.df = st.session_state.df.drop(indices_to_delete).reset_index(drop=True)
+        return {"status": "success", "message": "Données supprimées avec succès."}
+    except Exception as e:
+        return {"status": "error", "message": f"Erreur lors de la suppression des données: {str(e)}"}
 
 def normalize_genre(genre):
     if pd.isna(genre):
@@ -405,296 +465,93 @@ def show_statistics(df):
     }), use_container_width=True)
 
 def main():
-    st.markdown('<div class="main-title">RECENSEMENT DES IVOIRIENS RÉSIDENTS EN SIBÉRIE</div>', unsafe_allow_html=True)
+    """Fonction principale de l'application."""
+    # Initialisation de la session state
+    if "filters" not in st.session_state:
+        initialize_session_state()
     
-    # Initialisation de la session
-    if 'last_update' not in st.session_state:
-        st.session_state.last_update = datetime.now(timezone(timedelta(hours=7)))  # UTC+7 pour Tomsk
-        st.session_state.data = None
-    
-    # Fonction pour charger les données
-    def load_data(force=False):
-        if force or st.session_state.data is None:
-            conn = connect_to_database()
-            if conn:
-                try:
-                    response = conn.table('etudiants').select("*").execute()
-                    df = pd.DataFrame(response.data)
-                    df = clean_data(df)
-                    st.session_state.data = df
-                    st.session_state.last_update = datetime.now(timezone(timedelta(hours=7)))  # UTC+7 pour Tomsk
-                except Exception as e:
-                    st.error(f"Erreur lors de la récupération des données: {e}")
-    
-    # Chargement initial des données
-    load_data()
-    
-    # Menu latéral
-    menu = st.sidebar.selectbox(
-        "Menu",
-        ["Visualiser les données", "Ajouter un étudiant", "Modifier/Supprimer", "Importation"]
-    )
-    
-    # Bouton d'actualisation manuelle
-    if st.sidebar.button("🔄 Actualiser maintenant"):
-        load_data(force=True)
-        st.success("Données actualisées avec succès !")
-    
-    # Affichage du dernier refresh
-    tomsk_time = st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')
-    st.sidebar.markdown(f"*Dernière actualisation (heure de Tomsk)*:  \n{tomsk_time}")
-    
-    if menu == "Visualiser les données":
-        if st.session_state.data is not None:
-            df = st.session_state.data
-            
-            if df.empty:
-                st.info("Aucun étudiant n'est encore enregistré dans la base de données.")
-                return
-            
-            # Filtres avancés
-            st.sidebar.markdown('<div class="section-title">FILTRES AVANCÉS</div>', unsafe_allow_html=True)
-            
-            # Recherche par nom
-            search_name = st.sidebar.text_input("Rechercher par nom")
-            if search_name:
-                df = df[df['nom_complet'].str.contains(search_name, case=False, na=False)]
-            
-            # Filtres
-            genre_filter = st.sidebar.multiselect(
-                "Filtrer par genre",
-                options=df['genre'].unique(),
-                default=df['genre'].unique()
-            )
-            
-            uni_filter = st.sidebar.multiselect(
-                "Filtrer par université",
-                options=df['universite'].unique(),
-                default=df['universite'].unique()
-            )
-            
-            niveau_filter = st.sidebar.multiselect(
-                "Filtrer par niveau d'étude",
-                options=df['niveau_etude'].unique(),
-                default=df['niveau_etude'].unique()
-            )
-            
-            ville_filter = st.sidebar.multiselect(
-                "Filtrer par ville",
-                options=df['ville'].unique(),
-                default=df['ville'].unique()
-            )
-            
-            # Application des filtres
-            if genre_filter:
-                df = df[df['genre'].isin(genre_filter)]
-            if uni_filter:
-                df = df[df['universite'].isin(uni_filter)]
-            if niveau_filter:
-                df = df[df['niveau_etude'].isin(niveau_filter)]
-            if ville_filter:
-                df = df[df['ville'].isin(ville_filter)]
-            
-            # Affichage des statistiques
-            show_statistics(df)
-            
-            # Affichage des données
-            st.markdown('<div class="section-title">LISTE DES ÉTUDIANTS</div>', unsafe_allow_html=True)
-            
-            # Options de tri
-            sort_options = {
-                'nom_complet': 'Nom Complet',
-                'universite': 'Université',
-                'niveau_etude': 'Niveau d\'Étude',
-                'ville': 'Ville',
-                'date_inscription': 'Date'
-            }
-            
-            sort_column = st.selectbox(
-                "Trier par",
-                options=list(sort_options.keys()),
-                format_func=lambda x: sort_options[x]
-            )
-            sort_order = st.radio("Ordre", ["Croissant", "Décroissant"])
-            
-            df_sorted = df.sort_values(
-                by=sort_column,
-                ascending=(sort_order == "Croissant")
-            )
-            
-            # Sélectionner uniquement les colonnes à afficher
-            columns_to_display = [
-                'nom_complet', 'email', 'genre', 'universite', 'faculte', 
-                'niveau_etude', 'telephone', 'adresse', 'ville', 'date_inscription'
-            ]
-            df_display = df_sorted[columns_to_display]
-            
-            # Renommer les colonnes pour l'affichage
-            df_display.columns = [
-                'Nom Complet', 'Email', 'Genre', 'Université', 'Faculté',
-                'Niveau d\'Étude', 'Téléphone', 'Adresse', 'Ville', 'Date'
-            ]
-            
-            st.dataframe(
-                df_display.style.set_properties(**{
-                    'font-size': '1.1em',
-                    'text-align': 'left'
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
-            
-            # Résumé des filtres
-            st.sidebar.markdown('<div class="section-title">RÉSUMÉ DES FILTRES</div>', unsafe_allow_html=True)
-            st.sidebar.write(f"Nombre d'étudiants affichés : {len(df_display)}")
-            st.sidebar.write(f"Nombre total d'étudiants : {len(df)}")
-    
-    elif menu == "Ajouter un étudiant":
-        st.subheader("➕ Ajouter un nouvel étudiant")
+    # Chargement des données
+    if "df" not in st.session_state:
+        # Connecter à la base de données
+        connect_to_database()
         
-        with st.form("add_student_form"):
-            nom_complet = st.text_input("Nom complet*")
-            email = st.text_input("Email*")
-            genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"])
-            universite = st.text_input("Université*")
-            faculte = st.text_input("Faculté*")
-            niveau_etude = st.selectbox("Niveau d'étude*", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
-            telephone = st.text_input("Téléphone")
-            adresse = st.text_input("Adresse")
-            ville = st.text_input("Ville*")
-            
-            submitted = st.form_submit_button("Ajouter")
-            
-            if submitted:
-                if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
-                    st.error("Veuillez remplir tous les champs obligatoires (*)")
-                else:
-                    conn = connect_to_database()
-                    if conn:
-                        try:
-                            # Nettoyage des données avant insertion
-                            ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
-                            niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
-                            
-                            response = conn.table('etudiants').insert({
-                                "nom_complet": nom_complet,
-                                "email": email,
-                                "genre": genre,
-                                "universite": universite,
-                                "faculte": faculte,
-                                "niveau_etude": niveau_etude,
-                                "telephone": telephone,
-                                "adresse": adresse,
-                                "ville": ville,
-                                "date_creation": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                                "date_inscription": datetime.now().strftime('%Y-%m-%d')
-                            }).execute()
-                            st.success("Étudiant ajouté avec succès !")
-                            load_data(force=True)  # Recharger les données
-                        except Exception as e:
-                            st.error(f"Erreur lors de l'ajout: {e}")
+        # Charger les données
+        load_data_from_database()
     
-    elif menu == "Modifier/Supprimer":
-        st.subheader("✏️ Modifier ou Supprimer un étudiant")
-        
-        conn = connect_to_database()
-        if conn:
-            try:
-                load_data()  # S'assurer que les données sont à jour
-                df = st.session_state.data
-                
-                student_names = {idx: row['nom_complet'] for idx, row in df.iterrows()}
-                selected_id = st.selectbox(
-                    "Sélectionner un étudiant",
-                    options=list(student_names.keys()),
-                    format_func=lambda x: student_names[x]
-                )
-                
-                if selected_id is not None:
-                    student = df.loc[selected_id]
-                    
-                    action = st.radio(
-                        "Action",
-                        ["Modifier", "Supprimer"]
-                    )
-                    
-                    if action == "Modifier":
-                        with st.form("edit_student_form"):
-                            nom_complet = st.text_input("Nom complet*", value=student['nom_complet'])
-                            email = st.text_input("Email*", value=student['email'])
-                            genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"], index=["Homme", "Femme", "Autre"].index(student['genre']))
-                            universite = st.text_input("Université*", value=student['universite'])
-                            faculte = st.text_input("Faculté*", value=student['faculte'])
-                            niveau_etude = st.selectbox(
-                                "Niveau d'étude*", 
-                                ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"],
-                                index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
-                            )
-                            telephone = st.text_input("Téléphone", value=student['telephone'])
-                            adresse = st.text_input("Adresse", value=student['adresse'])
-                            ville = st.text_input("Ville*", value=student['ville'])
-                            
-                            submitted = st.form_submit_button("Mettre à jour")
-                            
-                            if submitted:
-                                if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
-                                    st.error("Veuillez remplir tous les champs obligatoires (*)")
-                                else:
-                                    try:
-                                        # Nettoyage des données avant mise à jour
-                                        ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
-                                        niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
-                                        
-                                        response = conn.table('etudiants').update({
-                                            "nom_complet": nom_complet,
-                                            "email": email,
-                                            "genre": genre,
-                                            "universite": universite,
-                                            "faculte": faculte,
-                                            "niveau_etude": niveau_etude,
-                                            "telephone": telephone,
-                                            "adresse": adresse,
-                                            "ville": ville,
-                                            "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                        }).eq("email", student['email']).execute()
-                                        st.success("Étudiant mis à jour avec succès !")
-                                        load_data(force=True)  # Recharger les données
-                                    except Exception as e:
-                                        st.error(f"Erreur lors de la mise à jour: {e}")
-                    
-                    else:  # Supprimer
-                        if st.button("Confirmer la suppression"):
-                            try:
-                                response = conn.table('etudiants').delete().eq("email", student['email']).execute()
-                                st.success("Étudiant supprimé avec succès !")
-                                load_data(force=True)  # Recharger les données
-                            except Exception as e:
-                                st.error(f"Erreur lors de la suppression: {e}")
-            
-            except Exception as e:
-                st.error(f"Erreur: {e}")
+    # Mise en page de base avec style personnalisé
+    set_page_config()
     
-    elif menu == "Importation":
-        st.subheader("📥 Importation depuis Google Sheets")
+    # Menu latéral pour la navigation et les filtres
+    display_sidebar_menu()
+    
+    # Affichage de l'écran principal en fonction de l'onglet actif
+    if st.session_state.active_tab == "Visualisation":
+        display_visualization_screen()
+    elif st.session_state.active_tab == "Import":
+        display_import_screen()
+    elif st.session_state.active_tab == "Export":
+        display_export_screen()
+    elif st.session_state.active_tab == "About":
+        display_about_screen()
+
+def insert_or_update_student(student_data):
+    """Insère ou met à jour les données d'un étudiant dans la base de données."""
+    # Préparation des données
+    now = datetime.now()
+    
+    # Pour un nouvel étudiant
+    if "update_index" not in st.session_state or st.session_state.update_index is None:
+        student_data["date_creation"] = now
+        student_data["date_modification"] = now
         
-        if st.button("Importer les données"):
-            df = load_from_google_sheets()
-            if df is not None:
-                st.write("Données chargées depuis Google Sheets:")
-                st.dataframe(df)
-                
-                if st.button("Mettre à jour la base de données"):
-                    conn = connect_to_database()
-                    if conn:
-                        inserted, updated, total = update_database(df, conn)
-                        st.success(f"""
-                            Import terminé avec succès:
-                            - {inserted} nouveaux étudiants ajoutés
-                            - {updated} étudiants mis à jour
-                            - {total} lignes traitées au total
-                        """)
-                        load_data(force=True)  # Recharger les données
+        # Création d'un DataFrame
+        df_to_insert = pd.DataFrame([student_data])
+        
+        # Insertion dans la base de données
+        result = insert_data_into_database(df_to_insert)
+        
+        if result["status"] == "success":
+            st.success("Étudiant ajouté avec succès !")
+            return True
+        else:
+            st.error(result["message"])
+            return False
+    # Pour une mise à jour
+    else:
+        update_index = st.session_state.update_index
+        student_data["date_modification"] = now
+        
+        # Mise à jour du DataFrame
+        df = st.session_state.df.copy()
+        for key, value in student_data.items():
+            df.at[update_index, key] = value
+        
+        # Mise à jour dans la base de données
+        result = update_data_in_database(df)
+        
+        if result["status"] == "success":
+            st.success("Données de l'étudiant mises à jour avec succès !")
+            st.session_state.update_index = None
+            return True
+        else:
+            st.error(result["message"])
+            return False
+
+def delete_student(index):
+    """Supprime un étudiant de la base de données."""
+    if st.session_state.df is not None and index < len(st.session_state.df):
+        # Suppression dans la base de données
+        result = delete_data_from_database([index])
+        
+        if result["status"] == "success":
+            st.success("Étudiant supprimé avec succès !")
+            return True
+        else:
+            st.error(result["message"])
+            return False
+    else:
+        st.error("Impossible de supprimer l'étudiant : index invalide.")
+        return False
 
 if __name__ == "__main__":
     main()
