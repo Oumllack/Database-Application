@@ -28,22 +28,23 @@ st.set_page_config(
 # Initialisation du client Supabase
 def init_supabase():
     try:
+        st.write("Initialisation de Supabase...")
         # Informations de connexion directes
         supabase_url = "https://ookqqfxklaucvfvlbmge.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9va3FxZnhrbGF1Y3ZmdmxibWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MTg1NzQsImV4cCI6MjA2MDI5NDU3NH0.M5iHbjRcnyFY_8qAOg8my6aD3qO85IJEV8FPa4CUiaY"
         
-        # Création du client avec supabase-py 2.0.3
-        client = create_client(
-            supabase_url=supabase_url,
-            supabase_key=supabase_key
-        )
+        st.write("Création du client...")
+        client = create_client(supabase_url, supabase_key)
         
-        # Test de connexion
-        client.table("etudiants").select("*").limit(1).execute()
+        st.write("Test de connexion...")
+        # Test de connexion simple
+        response = client.table("etudiants").select("*").limit(1).execute()
+        st.write("Connexion réussie !")
         
         return client
     except Exception as e:
         st.error(f"Erreur d'initialisation de Supabase: {str(e)}")
+        st.write(f"Détails de l'erreur: {type(e).__name__}")
         return None
 
 # Style personnalisé
