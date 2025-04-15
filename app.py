@@ -11,7 +11,7 @@ import googleapiclient.discovery
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import json
-from supabase import create_client, Client
+from supabase import create_client
 import numpy as np
 import altair as alt
 from streamlit_extras.stylable_container import stylable_container
