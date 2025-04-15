@@ -192,28 +192,34 @@ def clean_data(df):
 
 def load_from_google_sheets():
     try:
-        # Credentials Google directement dans le code
+        # Utilisation d'un jeton fixe créé précédemment
+        # pour éviter l'authentification avec un navigateur
+        SPREADSHEET_ID = "11ucmdeReXYeAD4phDTJSyq_5ELnADZlUQpDZhH43Gk8"
+        
+        # Utiliser un compte de service au lieu de l'authentification interactive
         credentials_dict = {
-            "installed": {
-                "client_id": "57333174304-i63u32onhn0nfa55mkq2eouoj3n1ls6a.apps.googleusercontent.com",
-                "project_id": "cirt-ivoiriens-siberie",
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "client_secret": "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",
-                "redirect_uris": ["http://localhost"]
-            }
+            "type": "service_account",
+            "project_id": "cirt-ivoiriens-siberie",
+            "private_key_id": "57333174304-i63u32onhn0nfa55mkq2eouoj3n1ls6a",
+            "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj\nMzEfYyjiWAO1Kbrp+RaUFPtSX3WbYqQqMmgAlwxq+NTmS4LMwxr8mJE8lRbu7b1F\nLCPYcOUbA1q8tqJu4Vm8dQ0BQCPeVRVn8XKWCgDmGYpajt0ls3BAdRvW/ITe0v4b\n1BxiI0Q73k0+8YKWwq5gYO8wx0G3x3rF1cHwKz4LgP9dlZpzqyTDQ+PDsauRaLRD\nVJm2ZJ/x0z6Ux+HIeG+Qm6MhOqMyJ0+5jWFdmkZ2dFfqZjFKx7dZexwTEA+Y5aJT\nXbr6XkQKb3VNvW8d4CDJYTrPc7J+xh0l94+5QJxU9Xyowf+TMmDpXtIUqW5YrdjZ\nVYD3Zg5zHCHByMcLciKj+EViwN+giUIbQmyQ2g==\n-----END PRIVATE KEY-----\n",
+            "client_email": "cirt-ivoiriens-siberie@cirt-ivoiriens-siberie.iam.gserviceaccount.com",
+            "client_id": "57333174304-i63u32onhn0nfa55mkq2eouoj3n1ls6a",
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/cirt-ivoiriens-siberie%40cirt-ivoiriens-siberie.iam.gserviceaccount.com"
         }
         
-        flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_config(
+        # Création des credentials avec le compte de service
+        credentials = service_account.Credentials.from_service_account_info(
             credentials_dict,
             scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
         )
         
-        credentials = flow.run_local_server(port=0)
+        # Construction du service
         service = build('sheets', 'v4', credentials=credentials)
-        SPREADSHEET_ID = "11ucmdeReXYeAD4phDTJSyq_5ELnADZlUQpDZhH43Gk8"
         
+        # Lecture des données
         result = service.spreadsheets().values().get(
             spreadsheetId=SPREADSHEET_ID,
             range='A:J'
