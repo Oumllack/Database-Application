@@ -28,9 +28,19 @@ st.set_page_config(
 # Initialisation du client Supabase
 def init_supabase():
     try:
-        supabase_url = st.secrets["SUPABASE_URL"]
-        supabase_key = st.secrets["SUPABASE_KEY"]
-        client = create_client(supabase_url, supabase_key)
+        # Accès direct aux secrets via st.secrets
+        supabase_url = st.secrets["supabase"]["SUPABASE_URL"]
+        supabase_key = st.secrets["supabase"]["SUPABASE_KEY"]
+        
+        # Création du client avec les paramètres nommés
+        client = create_client(
+            supabase_url=supabase_url,
+            supabase_key=supabase_key
+        )
+        
+        # Test de connexion
+        client.table("etudiants").select("*").limit(1).execute()
+        
         return client
     except Exception as e:
         st.error(f"Erreur d'initialisation de Supabase: {str(e)}")
