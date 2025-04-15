@@ -389,7 +389,40 @@ def show_statistics(df):
     
     # Statistiques détaillées par faculté
     st.markdown('<div class="section-title">STATISTIQUES PAR FACULTÉ</div>', unsafe_allow_html=True)
-    fac_stats = df.groupby('faculte').agg({
+    
+    # Normaliser les noms de facultés pour éviter les doublons
+    df_fac = df.copy()
+    faculte_mapping = {
+        'économie': 'Économie',
+        'economie': 'Économie',
+        'Économie': 'Économie',
+        'Economie': 'Économie',
+        'Faculty of Economics': 'Économie',
+        'Faculté d\'économie': 'Économie',
+        'médecine': 'Médecine',
+        'medecine': 'Médecine',
+        'Médecine': 'Médecine',
+        'Medecine': 'Médecine',
+        'médical': 'Médecine',
+        'medical': 'Médecine',
+        'Faculty of Medicine': 'Médecine',
+        'informatique': 'Informatique',
+        'Informatique': 'Informatique',
+        'Computer Science': 'Informatique',
+        'IT': 'Informatique',
+        'ingénierie': 'Ingénierie',
+        'ingenierie': 'Ingénierie',
+        'Ingénierie': 'Ingénierie',
+        'Ingenierie': 'Ingénierie',
+        'Engineering': 'Ingénierie',
+        'droit': 'Droit',
+        'Droit': 'Droit',
+        'Law': 'Droit'
+    }
+    df_fac['faculte'] = df_fac['faculte'].str.strip()
+    df_fac['faculte'] = df_fac['faculte'].replace(faculte_mapping, regex=True)
+    
+    fac_stats = df_fac.groupby('faculte').agg({
         'id': 'count',
         'genre': lambda x: (x == 'Homme').sum()
     }).rename(columns={'id': 'Nombre total', 'genre': 'Nombre d\'hommes'})
