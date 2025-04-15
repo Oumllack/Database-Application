@@ -192,19 +192,41 @@ def clean_data(df):
 
 def load_from_google_sheets():
     try:
-        # Utiliser une URL de téléchargement CSV direct
-        # Format: https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv
+        # Credentials Google directement dans le code
+        credentials_dict = {
+            "installed": {
+                "client_id": "57333174304-i63u32onhn0nfa55mkq2eouoj3n1ls6a.apps.googleusercontent.com",
+                "project_id": "cirt-ivoiriens-siberie",
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                "client_secret": "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",
+                "redirect_uris": ["http://localhost"]
+            }
+        }
+        
+        flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_config(
+            credentials_dict,
+            scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
+        )
+        
+        credentials = flow.run_local_server(port=0)
+        service = build('sheets', 'v4', credentials=credentials)
         SPREADSHEET_ID = "11ucmdeReXYeAD4phDTJSyq_5ELnADZlUQpDZhH43Gk8"
-        csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv"
         
-        # Télécharger directement le CSV avec pandas
-        df = pd.read_csv(csv_url)
+        result = service.spreadsheets().values().get(
+            spreadsheetId=SPREADSHEET_ID,
+            range='A:J'
+        ).execute()
         
-        if df.empty:
+        values = result.get('values', [])
+        
+        if not values:
             st.error("Aucune donnée trouvée dans le Google Sheet.")
             return None
             
-        # Mapper les colonnes (ajuster selon les noms exacts dans votre CSV)
+        df = pd.DataFrame(values[1:], columns=values[0])
+        
         column_mapping = {
             "Date": "date_inscription",
             "Adresse e-mail ": "email",
@@ -218,29 +240,17 @@ def load_from_google_sheets():
             "Ville": "ville"
         }
         
-        # Renommer les colonnes en utilisant le mapping disponible
-        for orig, new in column_mapping.items():
-            if orig in df.columns:
-                df = df.rename(columns={orig: new})
-        
-        # Convertir les dates et ajouter les champs nécessaires
-        if 'date_inscription' in df.columns:
-            df['date_inscription'] = pd.to_datetime(df['date_inscription'], dayfirst=True, errors='coerce')
+        df = df.rename(columns=column_mapping)
+        df['date_inscription'] = pd.to_datetime(df['date_inscription'], dayfirst=True)
         df['date_creation'] = datetime.now()
         df['date_modification'] = datetime.now()
-        
-        # Normaliser le genre
-        if 'genre' in df.columns:
-            df['genre'] = df['genre'].apply(normalize_genre)
-        
-        # Nettoyer les données
+        df['genre'] = df['genre'].apply(normalize_genre)
         df = clean_data(df)
         
         return df
         
     except Exception as e:
         st.error(f"Erreur lors de l'importation depuis Google Sheets: {str(e)}")
-        st.info("Assurez-vous que le fichier Google Sheets est partagé publiquement avec l'option 'Toute personne disposant du lien'")
         return None
 
 def update_database(df, conn):
