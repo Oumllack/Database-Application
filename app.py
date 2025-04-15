@@ -25,6 +25,17 @@ st.set_page_config(
     layout="wide"
 )
 
+# Initialisation du client Supabase
+@st.cache_resource
+def init_supabase():
+    try:
+        supabase_url = st.secrets["SUPABASE_URL"]
+        supabase_key = st.secrets["SUPABASE_KEY"]
+        return create_client(supabase_url, supabase_key)
+    except Exception as e:
+        st.error(f"Erreur d'initialisation de Supabase: {str(e)}")
+        return None
+
 # Style personnalisé
 st.markdown("""
     <style>
@@ -99,48 +110,34 @@ def create_metric_card(title, value):
         </div>
     """, unsafe_allow_html=True)
 
+# Fonction pour vérifier les secrets requis
+def check_required_secrets():
+    required_secrets = ['SUPABASE_URL', 'SUPABASE_KEY']
+    missing_secrets = [secret for secret in required_secrets if secret not in st.secrets]
+    
+    if missing_secrets:
+        st.error(f"Secrets manquants : {', '.join(missing_secrets)}")
+        return False
+    return True
+
+# Fonction pour se connecter à la base de données
 def connect_to_database():
+    if not check_required_secrets():
+        return None
+    
     try:
-        # Log de débogage
-        st.write("Tentative de connexion à la base de données...")
-        
-        # Vérification des secrets
-        if not hasattr(st, 'secrets'):
-            st.error("Les secrets ne sont pas configurés. Veuillez vérifier la configuration dans Streamlit Cloud.")
-            return None
-            
-        # Log des secrets disponibles
-        st.write("Secrets disponibles:", list(st.secrets.keys()))
-        
-        # Vérification des clés requises
-        required_secrets = ['SUPABASE_URL', 'SUPABASE_KEY']
-        missing_secrets = [secret for secret in required_secrets if secret not in st.secrets]
-        
-        if missing_secrets:
-            st.error(f"Secrets manquants : {', '.join(missing_secrets)}")
-            return None
-            
         # Création du client Supabase
         st.write("Création du client Supabase...")
-        supabase: Client = create_client(
-            st.secrets["SUPABASE_URL"],
-            st.secrets["SUPABASE_KEY"]
-        )
+        supabase = init_supabase()
         
-        # Test de connexion
-        st.write("Test de connexion à la base de données...")
-        try:
-            response = supabase.table('etudiants').select("count").execute()
-            if response.data:
-                st.write("Connexion réussie !")
-                return supabase
-            else:
-                st.error("Erreur de connexion à la base de données : Impossible de récupérer les données")
-                return None
-        except Exception as e:
-            st.error(f"Erreur lors du test de connexion : {str(e)}")
+        if supabase is None:
             return None
             
+        # Test de la connexion
+        response = supabase.table('etudiants').select("count").execute()
+        st.success("Connexion à la base de données réussie !")
+        return supabase
+        
     except Exception as e:
         st.error(f"Erreur de connexion à la base de données: {str(e)}")
         return None
