@@ -1,0 +1,17 @@
+# Fichiers sensibles
+sheet_id.txt
+credentials.json
+token.json
+
+# Environnements virtuels
+venv/
+env/
+.env
+
+# Fichiers systèmes
+.DS_Store
+__pycache__/
+*.pyc
+
+# Fichiers de configuration locaux
+.streamlit/secrets.toml 
