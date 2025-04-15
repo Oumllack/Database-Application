@@ -28,15 +28,15 @@ st.set_page_config(
 # Initialisation du client Supabase
 def init_supabase():
     try:
-        # Accès direct aux secrets via st.secrets
-        supabase_url = st.secrets["supabase"]["SUPABASE_URL"]
-        supabase_key = st.secrets["supabase"]["SUPABASE_KEY"]
+        # Utilisation des informations de connexion de la section postgres
+        host = st.secrets["postgres"]["host"]
+        key = st.secrets["postgres"]["password"]  # Utilisation du mot de passe comme clé API
         
-        # Création du client avec les paramètres nommés
-        client = create_client(
-            supabase_url=supabase_url,
-            supabase_key=supabase_key
-        )
+        # Construction de l'URL Supabase à partir de l'hôte
+        supabase_url = f"https://{host.split('.')[0]}.supabase.co"
+        
+        # Création du client
+        client = create_client(supabase_url, key)
         
         # Test de connexion
         client.table("etudiants").select("*").limit(1).execute()
