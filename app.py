@@ -114,17 +114,6 @@ def create_metric_card(title, value):
         </div>
     """, unsafe_allow_html=True)
 
-# Fonction pour vérifier les secrets requis
-def check_required_secrets():
-    # Vérification des secrets Google Sheets uniquement
-    required_secrets = ['SPREADSHEET_ID']
-    missing_secrets = [secret for secret in required_secrets if secret not in st.secrets.get('google_sheets', {})]
-    
-    if missing_secrets:
-        st.error(f"Secrets manquants : {', '.join(missing_secrets)}")
-        return False
-    return True
-
 # Fonction pour se connecter à la base de données
 def connect_to_database():
     try:
