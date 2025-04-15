@@ -32,11 +32,8 @@ def init_supabase():
         supabase_url = "https://ookqqfxklaucvfvlbmge.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9va3FxZnhrbGF1Y3ZmdmxibWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDQ3MTg1NzQsImV4cCI6MjA2MDI5NDU3NH0.M5iHbjRcnyFY_8qAOg8my6aD3qO85IJEV8FPa4CUiaY"
         
-        # Création du client avec les paramètres nommés
-        client = create_client(
-            supabase_url=supabase_url,
-            supabase_key=supabase_key
-        )
+        # Création du client avec supabase-py
+        client = create_client(supabase_url, supabase_key)
         
         return client
     except Exception as e:
