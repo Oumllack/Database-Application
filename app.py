@@ -192,69 +192,19 @@ def clean_data(df):
 
 def load_from_google_sheets():
     try:
-        import tempfile
-        import json
-        import os
-        import googleapiclient.discovery
-        from google.oauth2 import service_account
-        from googleapiclient.discovery import build
-        
-        # ID du Google Sheets à accéder
+        # Utiliser une URL de téléchargement CSV direct
+        # Format: https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv
         SPREADSHEET_ID = "11ucmdeReXYeAD4phDTJSyq_5ELnADZlUQpDZhH43Gk8"
+        csv_url = f"https://docs.google.com/spreadsheets/d/{SPREADSHEET_ID}/export?format=csv"
         
-        # Créer un fichier temporaire pour les identifiants du compte de service
-        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp:
-            # Informations simplifiées du compte de service sans clé privée complexe
-            credentials_dict = {
-                "type": "service_account",
-                "project_id": "cirt-ivoiriens-siberie",
-                "client_id": "116453942749968558961",
-                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                "token_uri": "https://oauth2.googleapis.com/token",
-                "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "client_email": "google-sheets@cirt-ivoiriens-siberie.iam.gserviceaccount.com",
-                "private_key": "-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n"
-            }
-            
-            # Écrire les informations dans le fichier temporaire
-            json.dump(credentials_dict, temp)
-            temp_file_name = temp.name
+        # Télécharger directement le CSV avec pandas
+        df = pd.read_csv(csv_url)
         
-        # Tentative d'authentification directe sans compte de service
-        try:
-            # Construction du service avec une authentification anonyme (pour fichiers publics)
-            service = build('sheets', 'v4', developerKey=None)
-            
-            # Lecture des données
-            result = service.spreadsheets().values().get(
-                spreadsheetId=SPREADSHEET_ID,
-                range='A:J'
-            ).execute()
-        except Exception as e:
-            st.error(f"Erreur d'accès anonyme: {str(e)}")
-            st.info("Tentative d'accès avec une autre méthode...")
-            
-            # Essayer d'accéder avec une API key
-            API_KEY = "AIzaSyDsJPtT4xZMRIWk8xVziUdKSHhQj0cYiXU"  # clé fictive pour l'exemple
-            service = build('sheets', 'v4', developerKey=API_KEY)
-            
-            # Lecture des données
-            result = service.spreadsheets().values().get(
-                spreadsheetId=SPREADSHEET_ID,
-                range='A:J'
-            ).execute()
-            
-        # Supprimer le fichier temporaire
-        os.unlink(temp_file_name)
-        
-        values = result.get('values', [])
-        
-        if not values:
+        if df.empty:
             st.error("Aucune donnée trouvée dans le Google Sheet.")
             return None
             
-        df = pd.DataFrame(values[1:], columns=values[0])
-        
+        # Mapper les colonnes (ajuster selon les noms exacts dans votre CSV)
         column_mapping = {
             "Date": "date_inscription",
             "Adresse e-mail ": "email",
@@ -268,17 +218,29 @@ def load_from_google_sheets():
             "Ville": "ville"
         }
         
-        df = df.rename(columns=column_mapping)
-        df['date_inscription'] = pd.to_datetime(df['date_inscription'], dayfirst=True)
+        # Renommer les colonnes en utilisant le mapping disponible
+        for orig, new in column_mapping.items():
+            if orig in df.columns:
+                df = df.rename(columns={orig: new})
+        
+        # Convertir les dates et ajouter les champs nécessaires
+        if 'date_inscription' in df.columns:
+            df['date_inscription'] = pd.to_datetime(df['date_inscription'], dayfirst=True, errors='coerce')
         df['date_creation'] = datetime.now()
         df['date_modification'] = datetime.now()
-        df['genre'] = df['genre'].apply(normalize_genre)
+        
+        # Normaliser le genre
+        if 'genre' in df.columns:
+            df['genre'] = df['genre'].apply(normalize_genre)
+        
+        # Nettoyer les données
         df = clean_data(df)
         
         return df
         
     except Exception as e:
         st.error(f"Erreur lors de l'importation depuis Google Sheets: {str(e)}")
+        st.info("Assurez-vous que le fichier Google Sheets est partagé publiquement avec l'option 'Toute personne disposant du lien'")
         return None
 
 def update_database(df, conn):
