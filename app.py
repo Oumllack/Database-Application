@@ -116,8 +116,9 @@ def create_metric_card(title, value):
 
 # Fonction pour vérifier les secrets requis
 def check_required_secrets():
-    required_secrets = ['SUPABASE_URL', 'SUPABASE_KEY']
-    missing_secrets = [secret for secret in required_secrets if secret not in st.secrets]
+    # Vérification des secrets Google Sheets uniquement
+    required_secrets = ['SPREADSHEET_ID']
+    missing_secrets = [secret for secret in required_secrets if secret not in st.secrets.get('google_sheets', {})]
     
     if missing_secrets:
         st.error(f"Secrets manquants : {', '.join(missing_secrets)}")
