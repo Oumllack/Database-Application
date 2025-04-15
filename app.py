@@ -408,9 +408,16 @@ def main():
         st.session_state.last_update = datetime.now(timezone(timedelta(hours=7)))  # UTC+7 pour Tomsk
         st.session_state.data = None
     
-    # Fonction pour charger les données
+    # Fonction pour charger et synchroniser les données
     def load_data(force=False):
         if force or st.session_state.data is None:
+            # Synchronisation automatique avec Google Sheets
+            df_gsheet = load_from_google_sheets()
+            if df_gsheet is not None:
+                conn = connect_to_database()
+                if conn:
+                    update_database(df_gsheet, conn)
+            # Rechargement depuis Supabase
             conn = connect_to_database()
             if conn:
                 try:
@@ -434,7 +441,7 @@ def main():
     # Bouton d'actualisation manuelle
     if st.sidebar.button("🔄 Actualiser maintenant"):
         load_data(force=True)
-        st.success("Données actualisées avec succès !")
+        st.success("Données synchronisées et actualisées avec succès depuis Google Sheets !")
     
     # Affichage du dernier refresh
     tomsk_time = st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')
