@@ -3,20 +3,30 @@ venv/
 env/
 .env
 
-# Fichiers de configuration sensibles
-.streamlit/secrets.toml
+# Fichiers de configuration
+.env
 credentials.json
 token.json
 
-# Fichiers Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Fichiers de système
+# Fichiers système
 .DS_Store
-Thumbs.db
+__pycache__/
+*.pyc
 
 # Fichiers de base de données
 *.db
-*.sqlite 
+*.sqlite3
+
+# Fichiers de log
+*.log
+
+# Fichiers temporaires
+*.tmp
+*.temp
+.coverage
+htmlcov/
+
+# Fichiers Python
+*.py[cod]
+*$py.class
+Thumbs.db 
