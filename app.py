@@ -127,9 +127,6 @@ def check_required_secrets():
 
 # Fonction pour se connecter à la base de données
 def connect_to_database():
-    if not check_required_secrets():
-        return None
-    
     try:
         # Création du client Supabase
         st.write("Création du client Supabase...")
