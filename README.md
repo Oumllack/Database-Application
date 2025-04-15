@@ -1,6 +1,6 @@
-# Gestion des Ivoiriens Résidents en Sibérie
+# Recensement des Ivoiriens Résidents en Sibérie
 
-Application de gestion des étudiants ivoiriens résidant en Sibérie.
+Application de recensement et de gestion des étudiants ivoiriens résidant en Sibérie.
 
 ## Déploiement sur Streamlit Cloud
 

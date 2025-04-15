@@ -20,8 +20,8 @@ import streamlit.components.v1 as components
 
 # Configuration de la page
 st.set_page_config(
-    page_title="Gestion des Ivoiriens Résidents en Sibérie",
-    page_icon="📊",
+    page_title="Recensement des Ivoiriens Résidents en Sibérie",
+    page_icon="🇨🇮",
     layout="wide"
 )
 
@@ -101,11 +101,46 @@ def create_metric_card(title, value):
 
 def connect_to_database():
     try:
+        # Log de débogage
+        st.write("Tentative de connexion à la base de données...")
+        
+        # Vérification des secrets
+        if not hasattr(st, 'secrets'):
+            st.error("Les secrets ne sont pas configurés. Veuillez vérifier la configuration dans Streamlit Cloud.")
+            return None
+            
+        # Log des secrets disponibles
+        st.write("Secrets disponibles:", list(st.secrets.keys()))
+        
+        # Vérification des clés requises
+        required_secrets = ['SUPABASE_URL', 'SUPABASE_KEY']
+        missing_secrets = [secret for secret in required_secrets if secret not in st.secrets]
+        
+        if missing_secrets:
+            st.error(f"Secrets manquants : {', '.join(missing_secrets)}")
+            return None
+            
+        # Création du client Supabase
+        st.write("Création du client Supabase...")
         supabase: Client = create_client(
-            st.secrets["supabase"]["url"],
-            st.secrets["supabase"]["key"]
+            st.secrets["SUPABASE_URL"],
+            st.secrets["SUPABASE_KEY"]
         )
-        return supabase
+        
+        # Test de connexion
+        st.write("Test de connexion à la base de données...")
+        try:
+            response = supabase.table('etudiants').select("count").execute()
+            if response.data:
+                st.write("Connexion réussie !")
+                return supabase
+            else:
+                st.error("Erreur de connexion à la base de données : Impossible de récupérer les données")
+                return None
+        except Exception as e:
+            st.error(f"Erreur lors du test de connexion : {str(e)}")
+            return None
+            
     except Exception as e:
         st.error(f"Erreur de connexion à la base de données: {str(e)}")
         return None
@@ -118,293 +153,74 @@ def normalize_genre(genre):
         return 'Homme'
     elif 'FEMME' in genre or 'FEMALE' in genre or 'F' in genre:
         return 'Femme'
-    else:
-        return 'Autre'
-
-def abbreviate_university(name):
-    if pd.isna(name) or name == "":
-        return "Inconnu"
-    abbreviations = {
-        "Université Polytechnique de Tomsk": "ТПУ",
-        "Université d'Etat de Tomsk": "ТГУ",
-        "Université d'Etat de Tomsk des Systemes de Controle et de Radioelectronique": "ТУСУР",
-        "Université d'Etat de Tomsk des Systèmes de Contrôle et de Radioélectronique": "ТУСУР",
-        "Université Médicale d'Etat de Sibérie": "СибГМУ",
-        "Université d'Etat d'Architecture et de Construction de Tomsk": "ТГАСУ",
-        "Université Médicale d'Etat de Kemerovo": "КемГМУ",
-        "Universite d'Etat de Tomsk": "ТГУ",
-        "Université d'État de Tomsk": "ТГУ",
-        "Université médicale d'Etat de Sibérie": "СибГМУ",
-        "Université d'Etat architecture construction Tomsk": "ТГАСУ",
-        "Tomsk State University": "ТГУ",
-        "Siberian State Medical University": "СибГМУ",
-        "Tomsk State University of Control Systems and Radioelectronics": "ТУСУР"
-    }
-    name = str(name).strip()
-    for full_name, abbrev in abbreviations.items():
-        if full_name.lower() == name.lower():
-            return abbrev
-    return name
+    return 'Autre'
 
 def clean_data(df):
-    """Nettoie et uniformise toutes les données"""
-    # Nettoyage des villes
-    if 'ville' in df.columns:
-        df['ville'] = df['ville'].astype(str).str.strip().str.title()
-        city_mapping = {
-            'Tomsk': 'Tomsk',
-            'Tomks': 'Tomsk',
-            'Tomsk ': 'Tomsk',
-            'Tomsk City': 'Tomsk',
-            'Tomskaya Oblast': 'Tomsk',
-            'Kemerovo': 'Kemerovo',
-            'Kemerovo ': 'Kemerovo',
-            'Kemerovo City': 'Kemerovo',
-            'Томск': 'Tomsk',
-            'Kemerovskaya Oblast': 'Kemerovo'
-        }
-        df['ville'] = df['ville'].replace(city_mapping)
-        # Standardisation finale - tout ce qui contient 'Tomsk' devient 'Tomsk'
-        df.loc[df['ville'].str.contains('Tomsk', case=False, na=False), 'ville'] = 'Tomsk'
-        df.loc[df['ville'].str.contains('Kemerovo', case=False, na=False), 'ville'] = 'Kemerovo'
+    # Nettoyage des données
+    df = df.copy()
     
-    # Nettoyage des niveaux d'étude
-    if 'niveau_etude' in df.columns:
-        df['niveau_etude'] = df['niveau_etude'].astype(str).str.strip()
-        niveau_mapping = {
-            'Master': 'Master',
-            'Master ': 'Master',
-            'Masters': 'Master',
-            'M2': 'Master',
-            'M1': 'Master',
-            'Bachelor': 'Bachelor',
-            'Licence': 'Bachelor',
-            'Doctorat': 'Doctorat',
-            'PhD': 'Doctorat',
-            'Spécialiste': 'Spécialiste',
-            'Année de langue': 'Année de langue'
-        }
-        df['niveau_etude'] = df['niveau_etude'].replace(niveau_mapping)
+    # Normalisation des genres
+    if 'genre' in df.columns:
+        df['genre'] = df['genre'].apply(normalize_genre)
+    
+    # Normalisation des villes
+    if 'ville' in df.columns:
+        df['ville'] = df['ville'].str.upper().str.strip()
+        df.loc[df['ville'].str.contains('TOMSK', case=False, na=False), 'ville'] = 'TOMSK'
     
     return df
 
-def load_from_google_sheets():
-    try:
-        with open('credentials.json', 'r') as f:
-            credentials_dict = json.load(f)
-        
-        flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_config(
-            credentials_dict,
-            scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
-        )
-        
-        credentials = flow.run_local_server(port=0)
-        service = build('sheets', 'v4', credentials=credentials)
-        SPREADSHEET_ID = "11ucmdeReXYeAD4phDTJSyq_5ELnADZlUQpDZhH43Gk8"
-        
-        result = service.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
-            range='A:J'
-        ).execute()
-        
-        values = result.get('values', [])
-        
-        if not values:
-            st.error("Aucune donnée trouvée dans le Google Sheet.")
-            return None
-            
-        df = pd.DataFrame(values[1:], columns=values[0])
-        
-        column_mapping = {
-            "Date": "date_inscription",
-            "Adresse e-mail ": "email",
-            "Nom": "nom_complet",
-            "Genre": "genre",
-            "Université": "universite",
-            "Faculté": "faculte",
-            "Niveau d'étude": "niveau_etude",
-            "Numéro de téléphone ": "telephone",
-            "Adresse de résidence": "adresse",
-            "Ville": "ville"
-        }
-        
-        df = df.rename(columns=column_mapping)
-        df['date_inscription'] = pd.to_datetime(df['date_inscription'], dayfirst=True)
-        df['date_creation'] = datetime.now()
-        df['date_modification'] = datetime.now()
-        df['genre'] = df['genre'].apply(normalize_genre)
-        
-        # Normalisation simple des villes
-        df['ville'] = df['ville'].str.upper().str.strip()
-        df.loc[df['ville'].str.contains('TOMSK', case=False, na=False), 'ville'] = 'TOMSK'
-        
-        return df
-        
-    except Exception as e:
-        st.error(f"Erreur lors de l'importation depuis Google Sheets: {str(e)}")
-        return None
-
-def update_database(df, conn):
-    try:
-        inserted = 0
-        updated = 0
-        total = len(df)
-        
-        for _, row in df.iterrows():
-            try:
-                response = conn.table('etudiants').select("*").eq("email", row['email']).execute()
-                if response.data:
-                    conn.table('etudiants').update({
-                        "nom_complet": row['nom_complet'],
-                        "genre": row['genre'],
-                        "universite": row['universite'],
-                        "faculte": row['faculte'],
-                        "niveau_etude": row['niveau_etude'],
-                        "telephone": row['telephone'],
-                        "adresse": row['adresse'],
-                        "ville": row['ville'],
-                        "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    }).eq("email", row['email']).execute()
-                    updated += 1
-                else:
-                    conn.table('etudiants').insert({
-                        "date_inscription": row['date_inscription'].strftime('%Y-%m-%d'),
-                        "email": row['email'],
-                        "nom_complet": row['nom_complet'],
-                        "genre": row['genre'],
-                        "universite": row['universite'],
-                        "faculte": row['faculte'],
-                        "niveau_etude": row['niveau_etude'],
-                        "telephone": row['telephone'],
-                        "adresse": row['adresse'],
-                        "ville": row['ville'],
-                        "date_creation": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                    }).execute()
-                    inserted += 1
-            except Exception as e:
-                st.warning(f"Erreur lors de l'importation de {row['email']}: {str(e)}")
-                continue
-        
-        return inserted, updated, total
-        
-    except Exception as e:
-        st.error(f"Erreur lors de la mise à jour de la base de données: {str(e)}")
-        return 0, 0, 0
-
 def show_statistics(df):
-    st.markdown('<div class="section-title">STATISTIQUES GÉNÉRALES</div>', unsafe_allow_html=True)
+    st.subheader("📊 Statistiques Générales")
     
     # Métriques principales
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     
     with col1:
         create_metric_card("Nombre total d'étudiants", len(df))
     
     with col2:
-        create_metric_card("Nombre d'hommes", len(df[df['genre'] == 'Homme']))
+        hommes = len(df[df['genre'] == 'Homme'])
+        create_metric_card("Nombre d'hommes", hommes)
     
     with col3:
-        create_metric_card("Nombre de femmes", len(df[df['genre'] == 'Femme']))
+        femmes = len(df[df['genre'] == 'Femme'])
+        create_metric_card("Nombre de femmes", femmes)
     
-    with col4:
-        create_metric_card("Nombre d'universités", df['universite'].nunique())
+    # Distribution par université
+    st.subheader("Distribution par université")
+    univ_counts = df['universite'].value_counts()
+    fig_univ = px.pie(
+        values=univ_counts.values,
+        names=univ_counts.index,
+        title="Répartition des étudiants par université"
+    )
+    st.plotly_chart(fig_univ)
     
-    # Graphiques principaux
-    col1, col2 = st.columns(2)
+    # Distribution par ville
+    st.subheader("Distribution par ville")
+    ville_counts = df['ville'].value_counts()
+    fig_ville = px.bar(
+        x=ville_counts.index,
+        y=ville_counts.values,
+        title="Nombre d'étudiants par ville",
+        labels={'x': 'Ville', 'y': 'Nombre d\'étudiants'}
+    )
+    st.plotly_chart(fig_ville)
     
-    with col1:
-        st.markdown('<div class="section-title">RÉPARTITION PAR GENRE</div>', unsafe_allow_html=True)
-        fig_genre = px.pie(df, names='genre', 
-                          color_discrete_sequence=['#7FB3D5', '#F5B7B1', '#A3E4D7'])
-        fig_genre.update_layout(
-            title_text='',
-            title_font_size=20,
-            legend_title_text='',
-            legend_title_font_size=16,
-            legend_font_size=14,
-            showlegend=True,
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        fig_genre.update_traces(textposition='inside', textinfo='percent+label')
-        st.plotly_chart(fig_genre, use_container_width=True)
-    
-    with col2:
-        st.markdown('<div class="section-title">RÉPARTITION PAR NIVEAU D\'ÉTUDE</div>', unsafe_allow_html=True)
-        niveau_counts = df['niveau_etude'].value_counts().reset_index()
-        niveau_counts.columns = ['niveau_etude', 'count']
-        
-        fig_niveau = px.bar(niveau_counts,
-                          x='niveau_etude',
-                          y='count',
-                          color_discrete_sequence=['#7FB3D5'])
-        fig_niveau.update_layout(
-            title_text='',
-            xaxis_title='',
-            yaxis_title='Nombre d\'étudiants',
-            showlegend=False,
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        st.plotly_chart(fig_niveau, use_container_width=True)
-    
-    # Graphiques secondaires
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown('<div class="section-title">RÉPARTITION PAR UNIVERSITÉ</div>', unsafe_allow_html=True)
-        df_uni = df.copy()
-        df_uni['universite'] = df_uni['universite'].apply(abbreviate_university)
-        uni_counts = df_uni['universite'].value_counts().reset_index()
-        uni_counts.columns = ['universite', 'count']
-        
-        fig_uni = px.bar(uni_counts,
-                        x='universite',
-                        y='count',
-                        color_discrete_sequence=['#7FB3D5'])
-        fig_uni.update_layout(
-            title_text='',
-            xaxis_title='',
-            yaxis_title='Nombre d\'étudiants',
-            showlegend=False,
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        st.plotly_chart(fig_uni, use_container_width=True)
-    
-    with col2:
-        st.markdown('<div class="section-title">RÉPARTITION PAR VILLE</div>', unsafe_allow_html=True)
-        fig_ville = px.bar(df['ville'].value_counts(),
-                          color_discrete_sequence=['#7FB3D5'])
-        fig_ville.update_layout(
-            title_text='',
-            title_font_size=20,
-            xaxis_title='',
-            yaxis_title='',
-            xaxis_title_font_size=16,
-            yaxis_title_font_size=16,
-            xaxis_tickfont_size=14,
-            yaxis_tickfont_size=14,
-            showlegend=False,
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        st.plotly_chart(fig_ville, use_container_width=True)
-    
-    # Statistiques détaillées par faculté
-    st.markdown('<div class="section-title">STATISTIQUES PAR FACULTÉ</div>', unsafe_allow_html=True)
-    fac_stats = df.groupby('faculte').agg({
-        'id': 'count',
-        'genre': lambda x: (x == 'Homme').sum()
-    }).rename(columns={'id': 'Nombre total', 'genre': 'Nombre d\'hommes'})
-    fac_stats['Nombre de femmes'] = fac_stats['Nombre total'] - fac_stats['Nombre d\'hommes']
-    fac_stats['Pourcentage d\'hommes'] = (fac_stats['Nombre d\'hommes'] / fac_stats['Nombre total'] * 100).round(1)
-    fac_stats['Pourcentage de femmes'] = (fac_stats['Nombre de femmes'] / fac_stats['Nombre total'] * 100).round(1)
-    
-    st.dataframe(fac_stats.style.format({
-        'Pourcentage d\'hommes': '{:.1f}%',
-        'Pourcentage de femmes': '{:.1f}%'
-    }), use_container_width=True)
+    # Distribution par niveau d'étude
+    st.subheader("Distribution par niveau d'étude")
+    niveau_counts = df['niveau_etude'].value_counts()
+    fig_niveau = px.bar(
+        x=niveau_counts.index,
+        y=niveau_counts.values,
+        title="Nombre d'étudiants par niveau d'étude",
+        labels={'x': 'Niveau d\'étude', 'y': 'Nombre d\'étudiants'}
+    )
+    st.plotly_chart(fig_niveau)
 
 def main():
-    st.markdown('<div class="main-title">GESTION DES IVOIRIENS RÉSIDENTS EN SIBÉRIE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">RECENSEMENT DES IVOIRIENS RÉSIDENTS EN SIBÉRIE</div>', unsafe_allow_html=True)
     
     # Initialisation de la session
     if 'last_update' not in st.session_state:
@@ -443,125 +259,62 @@ def main():
     st.sidebar.markdown(f"*Dernière actualisation*:  \n{st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')}")
     
     if menu == "Visualiser les données":
+        st.subheader("📊 Visualisation des données")
+        
         if st.session_state.data is not None:
-            df = st.session_state.data
-            
-            if df.empty:
-                st.info("Aucun étudiant n'est encore enregistré dans la base de données.")
-                return
-            
-            # Filtres avancés
-            st.sidebar.markdown('<div class="section-title">FILTRES AVANCÉS</div>', unsafe_allow_html=True)
-            
-            # Recherche par nom
-            search_name = st.sidebar.text_input("Rechercher par nom")
-            if search_name:
-                df = df[df['nom_complet'].str.contains(search_name, case=False, na=False)]
+            # Affichage des statistiques
+            show_statistics(st.session_state.data)
             
             # Filtres
-            genre_filter = st.sidebar.multiselect(
-                "Filtrer par genre",
-                options=df['genre'].unique(),
-                default=df['genre'].unique()
-            )
+            st.subheader("Filtres")
+            col1, col2 = st.columns(2)
             
-            uni_filter = st.sidebar.multiselect(
-                "Filtrer par université",
-                options=df['universite'].unique(),
-                default=df['universite'].unique()
-            )
+            with col1:
+                selected_universite = st.multiselect(
+                    "Université",
+                    options=sorted(st.session_state.data['universite'].unique()),
+                    default=[]
+                )
             
-            niveau_filter = st.sidebar.multiselect(
-                "Filtrer par niveau d'étude",
-                options=df['niveau_etude'].unique(),
-                default=df['niveau_etude'].unique()
-            )
-            
-            ville_filter = st.sidebar.multiselect(
-                "Filtrer par ville",
-                options=df['ville'].unique(),
-                default=df['ville'].unique()
-            )
+            with col2:
+                selected_ville = st.multiselect(
+                    "Ville",
+                    options=sorted(st.session_state.data['ville'].unique()),
+                    default=[]
+                )
             
             # Application des filtres
-            if genre_filter:
-                df = df[df['genre'].isin(genre_filter)]
-            if uni_filter:
-                df = df[df['universite'].isin(uni_filter)]
-            if niveau_filter:
-                df = df[df['niveau_etude'].isin(niveau_filter)]
-            if ville_filter:
-                df = df[df['ville'].isin(ville_filter)]
+            filtered_data = st.session_state.data.copy()
+            if selected_universite:
+                filtered_data = filtered_data[filtered_data['universite'].isin(selected_universite)]
+            if selected_ville:
+                filtered_data = filtered_data[filtered_data['ville'].isin(selected_ville)]
             
-            # Affichage des statistiques
-            show_statistics(df)
-            
-            # Affichage des données
-            st.markdown('<div class="section-title">LISTE DES ÉTUDIANTS</div>', unsafe_allow_html=True)
-            
-            # Options de tri
-            sort_options = {
-                'nom_complet': 'Nom Complet',
-                'universite': 'Université',
-                'niveau_etude': 'Niveau d\'Étude',
-                'ville': 'Ville',
-                'date_inscription': 'Date'
-            }
-            
-            sort_column = st.selectbox(
-                "Trier par",
-                options=list(sort_options.keys()),
-                format_func=lambda x: sort_options[x]
-            )
-            sort_order = st.radio("Ordre", ["Croissant", "Décroissant"])
-            
-            df_sorted = df.sort_values(
-                by=sort_column,
-                ascending=(sort_order == "Croissant")
-            )
-            
-            # Sélectionner uniquement les colonnes à afficher
-            columns_to_display = [
-                'nom_complet', 'email', 'genre', 'universite', 'faculte', 
-                'niveau_etude', 'telephone', 'adresse', 'ville', 'date_inscription'
-            ]
-            df_display = df_sorted[columns_to_display]
-            
-            # Renommer les colonnes pour l'affichage
-            df_display.columns = [
-                'Nom Complet', 'Email', 'Genre', 'Université', 'Faculté',
-                'Niveau d\'Étude', 'Téléphone', 'Adresse', 'Ville', 'Date'
-            ]
-            
-            st.dataframe(
-                df_display.style.set_properties(**{
-                    'font-size': '1.1em',
-                    'text-align': 'left'
-                }),
-                use_container_width=True,
-                hide_index=True
-            )
-            
-            # Résumé des filtres
-            st.sidebar.markdown('<div class="section-title">RÉSUMÉ DES FILTRES</div>', unsafe_allow_html=True)
-            st.sidebar.write(f"Nombre d'étudiants affichés : {len(df_display)}")
-            st.sidebar.write(f"Nombre total d'étudiants : {len(df)}")
+            # Affichage des données filtrées
+            st.dataframe(filtered_data)
+        else:
+            st.warning("Aucune donnée disponible. Veuillez actualiser ou importer des données.")
     
     elif menu == "Ajouter un étudiant":
         st.subheader("➕ Ajouter un nouvel étudiant")
         
         with st.form("add_student_form"):
-            nom_complet = st.text_input("Nom complet*")
-            email = st.text_input("Email*")
-            genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"])
-            universite = st.text_input("Université*")
-            faculte = st.text_input("Faculté*")
-            niveau_etude = st.selectbox("Niveau d'étude*", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
-            telephone = st.text_input("Téléphone")
-            adresse = st.text_input("Adresse")
-            ville = st.text_input("Ville*")
+            col1, col2 = st.columns(2)
             
-            submitted = st.form_submit_button("Ajouter")
+            with col1:
+                nom_complet = st.text_input("Nom complet *")
+                email = st.text_input("Email *")
+                genre = st.selectbox("Genre", ["Homme", "Femme", "Autre"])
+                universite = st.text_input("Université *")
+            
+            with col2:
+                faculte = st.text_input("Faculté *")
+                niveau_etude = st.text_input("Niveau d'étude *")
+                telephone = st.text_input("Téléphone")
+                adresse = st.text_input("Adresse")
+                ville = st.text_input("Ville *")
+            
+            submitted = st.form_submit_button("Ajouter l'étudiant")
             
             if submitted:
                 if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
@@ -619,19 +372,20 @@ def main():
                     
                     if action == "Modifier":
                         with st.form("edit_student_form"):
-                            nom_complet = st.text_input("Nom complet*", value=student['nom_complet'])
-                            email = st.text_input("Email*", value=student['email'])
-                            genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"], index=["Homme", "Femme", "Autre"].index(student['genre']))
-                            universite = st.text_input("Université*", value=student['universite'])
-                            faculte = st.text_input("Faculté*", value=student['faculte'])
-                            niveau_etude = st.selectbox(
-                                "Niveau d'étude*", 
-                                ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"],
-                                index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
-                            )
-                            telephone = st.text_input("Téléphone", value=student['telephone'])
-                            adresse = st.text_input("Adresse", value=student['adresse'])
-                            ville = st.text_input("Ville*", value=student['ville'])
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                nom_complet = st.text_input("Nom complet *", value=student['nom_complet'])
+                                email = st.text_input("Email *", value=student['email'])
+                                genre = st.selectbox("Genre", ["Homme", "Femme", "Autre"], index=["Homme", "Femme", "Autre"].index(student['genre']))
+                                universite = st.text_input("Université *", value=student['universite'])
+                            
+                            with col2:
+                                faculte = st.text_input("Faculté *", value=student['faculte'])
+                                niveau_etude = st.text_input("Niveau d'étude *", value=student['niveau_etude'])
+                                telephone = st.text_input("Téléphone", value=student['telephone'])
+                                adresse = st.text_input("Adresse", value=student['adresse'])
+                                ville = st.text_input("Ville *", value=student['ville'])
                             
                             submitted = st.form_submit_button("Mettre à jour")
                             

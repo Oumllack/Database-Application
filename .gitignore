@@ -6,6 +6,7 @@ env/
 # Fichiers de configuration sensibles
 .streamlit/secrets.toml
 credentials.json
+token.json
 
 # Fichiers Python
 __pycache__/
@@ -14,4 +15,8 @@ __pycache__/
 
 # Fichiers de système
 .DS_Store
-Thumbs.db 
+Thumbs.db
+
+# Fichiers de base de données
+*.db
+*.sqlite 
