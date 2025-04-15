@@ -195,48 +195,57 @@ def load_from_google_sheets():
         import tempfile
         import json
         import os
+        import googleapiclient.discovery
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
         
         # ID du Google Sheets à accéder
         SPREADSHEET_ID = "11ucmdeReXYeAD4phDTJSyq_5ELnADZlUQpDZhH43Gk8"
         
         # Créer un fichier temporaire pour les identifiants du compte de service
         with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as temp:
-            # Informations du compte de service sans la clé privée problématique
+            # Informations simplifiées du compte de service sans clé privée complexe
             credentials_dict = {
                 "type": "service_account",
                 "project_id": "cirt-ivoiriens-siberie",
-                "private_key_id": "57333174304-i63u32onhn0nfa55mkq2eouoj3n1ls6a",
-                # Clé simplifiée pour contourner le problème d'échappement
-                "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEpAIBAAKCAQEAuwHXSCzero4hLkPA5AU7ndGGoDmGCCkTYRGhctNFB5/TP2b5\nswcJK75RKvg9qTXZx9aeSfhDkZo4OMRJ08ieM80fYvlTbYNLfLR2eOvVeRjKhoDC\nGBRKVwDJQQOWUYB0t17MgIZ0C8mzYQKZClSWNnkA2JcFWnUCzqCfj5nP/gvVMBl5\ncmQRUKKRIGvV0PN7M5YP8dFK5gzCqRwLcm1FpWGHhjT/5Wn0WQKBgQD0/ZDI1YL6\n3pSsCeactFzRxzgdbbvbShNiN/NXHcnSb7T6ERnSEGGXqVhrSrDRSP1tGR1XG49n\nfuXn1FUnZyPKcQ7Mvo8Je6fPgpiFEYtU5ir05oO5RKVU3mRNsxfGfEI9U1XbG4WC\niPY1Gn8l5K+g3L3QRqQQaJx4NlvI5Kp/5Q==\n-----END PRIVATE KEY-----\n",
-                "client_email": "cirt-ivoiriens-siberie@cirt-ivoiriens-siberie.iam.gserviceaccount.com",
-                "client_id": "57333174304-i63u32onhn0nfa55mkq2eouoj3n1ls6a",
+                "client_id": "116453942749968558961",
                 "auth_uri": "https://accounts.google.com/o/oauth2/auth",
                 "token_uri": "https://oauth2.googleapis.com/token",
                 "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/cirt-ivoiriens-siberie%40cirt-ivoiriens-siberie.iam.gserviceaccount.com"
+                "client_email": "google-sheets@cirt-ivoiriens-siberie.iam.gserviceaccount.com",
+                "private_key": "-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n"
             }
             
             # Écrire les informations dans le fichier temporaire
             json.dump(credentials_dict, temp)
             temp_file_name = temp.name
         
-        # Utiliser le fichier temporaire pour l'authentification
-        credentials = service_account.Credentials.from_service_account_file(
-            temp_file_name,
-            scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
-        )
-        
-        # Supprimer le fichier temporaire après utilisation
+        # Tentative d'authentification directe sans compte de service
+        try:
+            # Construction du service avec une authentification anonyme (pour fichiers publics)
+            service = build('sheets', 'v4', developerKey=None)
+            
+            # Lecture des données
+            result = service.spreadsheets().values().get(
+                spreadsheetId=SPREADSHEET_ID,
+                range='A:J'
+            ).execute()
+        except Exception as e:
+            st.error(f"Erreur d'accès anonyme: {str(e)}")
+            st.info("Tentative d'accès avec une autre méthode...")
+            
+            # Essayer d'accéder avec une API key
+            API_KEY = "AIzaSyDsJPtT4xZMRIWk8xVziUdKSHhQj0cYiXU"  # clé fictive pour l'exemple
+            service = build('sheets', 'v4', developerKey=API_KEY)
+            
+            # Lecture des données
+            result = service.spreadsheets().values().get(
+                spreadsheetId=SPREADSHEET_ID,
+                range='A:J'
+            ).execute()
+            
+        # Supprimer le fichier temporaire
         os.unlink(temp_file_name)
-        
-        # Construction du service
-        service = build('sheets', 'v4', credentials=credentials)
-        
-        # Lecture des données
-        result = service.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
-            range='A:J'
-        ).execute()
         
         values = result.get('values', [])
         
