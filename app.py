@@ -299,7 +299,7 @@ def show_statistics(df):
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        create_metric_card("Nombre total d'étudiants", len(df))
+        create_metric_card("Nombre total d'Ivoiriens", len(df))
     
     with col2:
         create_metric_card("Nombre d'hommes", len(df[df['genre'] == 'Homme']))
@@ -341,7 +341,7 @@ def show_statistics(df):
         fig_niveau.update_layout(
             title_text='',
             xaxis_title='',
-            yaxis_title='Nombre d\'étudiants',
+            yaxis_title='Nombre d\'Ivoiriens',
             showlegend=False,
             margin=dict(l=20, r=20, t=20, b=20)
         )
@@ -353,7 +353,11 @@ def show_statistics(df):
     with col1:
         st.markdown('<div class="section-title">RÉPARTITION PAR UNIVERSITÉ</div>', unsafe_allow_html=True)
         df_uni = df.copy()
+        # Filtrer pour supprimer les valeurs vides ou "Inconnu"
+        df_uni = df_uni[df_uni['universite'].notna() & (df_uni['universite'] != "")]
         df_uni['universite'] = df_uni['universite'].apply(abbreviate_university)
+        # Filtrer après l'application de la fonction abbreviate_university pour supprimer "Inconnu"
+        df_uni = df_uni[df_uni['universite'] != "Inconnu"]
         uni_counts = df_uni['universite'].value_counts().reset_index()
         uni_counts.columns = ['universite', 'count']
         
@@ -364,7 +368,7 @@ def show_statistics(df):
         fig_uni.update_layout(
             title_text='',
             xaxis_title='',
-            yaxis_title='Nombre d\'étudiants',
+            yaxis_title='Nombre d\'Ivoiriens',
             showlegend=False,
             margin=dict(l=20, r=20, t=20, b=20)
         )
@@ -382,7 +386,7 @@ def show_statistics(df):
         fig_ville.update_layout(
             title_text='',
             xaxis_title='',
-            yaxis_title='Nombre d\'étudiants',
+            yaxis_title='Nombre d\'Ivoiriens',
             showlegend=False,
             margin=dict(l=20, r=20, t=20, b=20)
         )
