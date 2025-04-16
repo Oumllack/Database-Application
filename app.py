@@ -397,6 +397,9 @@ def show_statistics(df):
     
     # Normaliser les noms de facultés pour éviter les doublons
     df_fac = df.copy()
+    # Filtrer pour supprimer les facultés vides ou nulles
+    df_fac = df_fac[df_fac['faculte'].notna() & (df_fac['faculte'] != "")]
+    
     faculte_mapping = {
         'économie': 'Économie',
         'economie': 'Économie',
