@@ -604,9 +604,15 @@ def main():
                 hide_index=True
             )
             
-            # Ajouter la légende pour les anciens étudiants
+            # Ajouter la légende pour les anciens étudiants avec un style plus visible
             if 'statut' in df.columns and any(df_sorted['statut'] == 'Ancien étudiant'):
-                st.markdown("*_Note: Les noms avec un astérisque (*) représentent les Ivoiriens vivant en Sibérie qui ne sont plus étudiants_", unsafe_allow_html=False)
+                st.markdown("""
+                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                    <p style="font-size: 1em; font-style: italic; margin: 0;">
+                        <strong>Note:</strong> Les noms avec un astérisque (*) représentent les Ivoiriens vivant en Sibérie qui ne sont plus étudiants
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
             
             # Résumé des filtres
             st.sidebar.markdown('<div class="section-title">RÉSUMÉ DES FILTRES</div>', unsafe_allow_html=True)
