@@ -331,7 +331,9 @@ def show_statistics(df):
     
     with col2:
         st.markdown('<div class="section-title">RÉPARTITION PAR NIVEAU D\'ÉTUDE</div>', unsafe_allow_html=True)
-        niveau_counts = df['niveau_etude'].value_counts().reset_index()
+        # Filtrer pour supprimer les niveaux d'étude vides ou nuls
+        niveau_df = df[df['niveau_etude'].notna() & (df['niveau_etude'] != "") & (df['niveau_etude'] != "nan")]
+        niveau_counts = niveau_df['niveau_etude'].value_counts().reset_index()
         niveau_counts.columns = ['niveau_etude', 'count']
         
         fig_niveau = px.bar(niveau_counts,
@@ -354,7 +356,7 @@ def show_statistics(df):
         st.markdown('<div class="section-title">RÉPARTITION PAR UNIVERSITÉ</div>', unsafe_allow_html=True)
         df_uni = df.copy()
         # Filtrer pour supprimer les valeurs vides ou "Inconnu"
-        df_uni = df_uni[df_uni['universite'].notna() & (df_uni['universite'] != "")]
+        df_uni = df_uni[df_uni['universite'].notna() & (df_uni['universite'] != "") & (df_uni['universite'] != "nan")]
         df_uni['universite'] = df_uni['universite'].apply(abbreviate_university)
         # Filtrer après l'application de la fonction abbreviate_university pour supprimer "Inconnu"
         df_uni = df_uni[df_uni['universite'] != "Inconnu"]
