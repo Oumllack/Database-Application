@@ -606,7 +606,7 @@ def main():
             
             # Ajouter la légende pour les anciens étudiants
             if 'statut' in df.columns and any(df_sorted['statut'] == 'Ancien étudiant'):
-                st.markdown("*_Note: * indique un ancien étudiant_", unsafe_allow_html=False)
+                st.markdown("*_Note: Les noms avec un astérisque (*) représentent les Ivoiriens vivant en Sibérie qui ne sont plus étudiants_", unsafe_allow_html=False)
             
             # Résumé des filtres
             st.sidebar.markdown('<div class="section-title">RÉSUMÉ DES FILTRES</div>', unsafe_allow_html=True)
