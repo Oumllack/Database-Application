@@ -308,7 +308,9 @@ def show_statistics(df):
         create_metric_card("Nombre de femmes", len(df[df['genre'] == 'Femme']))
     
     with col4:
-        create_metric_card("Nombre d'universités", df['universite'].nunique())
+        # Compter uniquement les universités non vides
+        universites_non_vides = df[df['universite'].notna() & (df['universite'] != "") & (df['universite'] != "nan")]['universite'].nunique()
+        create_metric_card("Nombre d'universités", universites_non_vides)
     
     # Graphiques principaux
     col1, col2 = st.columns(2)
