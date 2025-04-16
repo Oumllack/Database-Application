@@ -443,6 +443,40 @@ def main():
     if 'last_update' not in st.session_state:
         st.session_state.last_update = datetime.now(timezone(timedelta(hours=7)))  # UTC+7 pour Tomsk
         st.session_state.data = None
+        st.session_state.columns_verified = False
+        st.session_state.missing_columns = []
+    
+    # Fonction pour vérifier les colonnes requises
+    def verify_columns():
+        if not st.session_state.columns_verified:
+            conn = connect_to_database()
+            if conn:
+                try:
+                    # Récupérer les informations sur la table
+                    response = conn.table('etudiants').select("*").limit(1).execute()
+                    if response.data:
+                        existing_columns = list(response.data[0].keys())
+                        required_columns = ['profession', 'statut']
+                        missing = [col for col in required_columns if col not in existing_columns]
+                        st.session_state.missing_columns = missing
+                        
+                        if missing:
+                            st.warning(f"""
+                            ⚠️ Les colonnes suivantes ne sont pas présentes dans votre base de données: {', '.join(missing)}
+                            
+                            Veuillez exécuter les requêtes SQL suivantes dans votre console Supabase:
+                            ```sql
+                            ALTER TABLE etudiants ADD COLUMN statut TEXT DEFAULT 'Étudiant actuel';
+                            ALTER TABLE etudiants ADD COLUMN profession TEXT;
+                            ```
+                            """)
+                    
+                    st.session_state.columns_verified = True
+                except Exception as e:
+                    st.error(f"Erreur lors de la vérification des colonnes: {str(e)}")
+    
+    # Vérifier les colonnes
+    verify_columns()
     
     # Fonction pour charger les données
     def load_data(force=False):
@@ -475,6 +509,10 @@ def main():
     # Affichage du dernier refresh
     tomsk_time = st.session_state.last_update.strftime('%Y-%m-%d %H:%M:%S')
     st.sidebar.markdown(f"*Dernière actualisation (heure de Tomsk)*:  \n{tomsk_time}")
+    
+    # Si des colonnes manquent, afficher un message d'avertissement
+    missing_cols = st.session_state.get('missing_columns', [])
+    has_missing_columns = len(missing_cols) > 0
     
     if menu == "Visualiser les données":
         if st.session_state.data is not None:
@@ -569,7 +607,7 @@ def main():
             # Sélectionner uniquement les colonnes à afficher
             columns_to_display = [
                 'nom_complet', 'email', 'genre', 'statut', 'universite', 'faculte', 
-                'niveau_etude', 'annee_fin', 'profession', 'telephone', 'ville', 'date_inscription'
+                'niveau_etude', 'profession', 'telephone', 'ville', 'date_inscription'
             ]
             
             # Filtrer les colonnes qui existent réellement dans le DataFrame
@@ -585,7 +623,6 @@ def main():
                 'universite': 'Université',
                 'faculte': 'Faculté',
                 'niveau_etude': 'Niveau d\'Étude',
-                'annee_fin': 'Année de fin',
                 'profession': 'Profession',
                 'telephone': 'Téléphone',
                 'adresse': 'Adresse',
@@ -629,8 +666,7 @@ def main():
                 universite = st.text_input("Dernière université fréquentée*")
                 faculte = st.text_input("Dernière faculté*")
                 niveau_etude = st.selectbox("Dernier niveau d'étude*", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
-                annee_fin = st.text_input("Année de fin d'études*")
-                profession = st.text_input("Profession actuelle")
+                profession = st.text_input("Profession actuelle*")
             
             telephone = st.text_input("Téléphone")
             adresse = st.text_input("Adresse")
@@ -643,7 +679,7 @@ def main():
                     st.error("Veuillez remplir tous les champs obligatoires (*)")
                 elif statut == "Étudiant actuel" and (not universite or not faculte or not niveau_etude):
                     st.error("Veuillez remplir tous les champs obligatoires pour les étudiants actuels (*)")
-                elif statut == "Ancien étudiant" and (not universite or not faculte or not niveau_etude or not annee_fin):
+                elif statut == "Ancien étudiant" and (not universite or not faculte or not niveau_etude or not profession):
                     st.error("Veuillez remplir tous les champs obligatoires pour les anciens étudiants (*)")
                 else:
                     conn = connect_to_database()
@@ -672,7 +708,6 @@ def main():
                             
                             # Ajouter les champs spécifiques aux anciens étudiants
                             if statut == "Ancien étudiant":
-                                student_data["annee_fin"] = annee_fin
                                 student_data["profession"] = profession
                             
                             response = conn.table('etudiants').insert(student_data).execute()
@@ -733,8 +768,7 @@ def main():
                                     index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
                                 )
                                 # Récupération des valeurs pour les anciens étudiants (ou valeur vide si non présente)
-                                annee_fin = st.text_input("Année de fin d'études*", value=student.get('annee_fin', ''))
-                                profession = st.text_input("Profession actuelle", value=student.get('profession', ''))
+                                profession = st.text_input("Profession actuelle*", value=student.get('profession', ''))
                             
                             telephone = st.text_input("Téléphone", value=student['telephone'])
                             adresse = st.text_input("Adresse", value=student['adresse'])
@@ -747,7 +781,7 @@ def main():
                                     st.error("Veuillez remplir tous les champs obligatoires (*)")
                                 elif statut == "Étudiant actuel" and (not universite or not faculte or not niveau_etude):
                                     st.error("Veuillez remplir tous les champs obligatoires pour les étudiants actuels (*)")
-                                elif statut == "Ancien étudiant" and (not universite or not faculte or not niveau_etude or not annee_fin):
+                                elif statut == "Ancien étudiant" and (not universite or not faculte or not niveau_etude or not profession):
                                     st.error("Veuillez remplir tous les champs obligatoires pour les anciens étudiants (*)")
                                 else:
                                     try:
@@ -760,7 +794,6 @@ def main():
                                             "nom_complet": nom_complet,
                                             "email": email,
                                             "genre": genre,
-                                            "statut": statut,
                                             "universite": universite,
                                             "faculte": faculte,
                                             "niveau_etude": niveau_etude,
@@ -770,10 +803,17 @@ def main():
                                             "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                                         }
                                         
-                                        # Ajouter les champs spécifiques aux anciens étudiants
-                                        if statut == "Ancien étudiant":
-                                            update_data["annee_fin"] = annee_fin
-                                            update_data["profession"] = profession
+                                        # Ajouter les champs spécifiques aux anciens étudiants seulement si les colonnes existent
+                                        missing_cols = st.session_state.get('missing_columns', [])
+                                        
+                                        # Ajouter le statut uniquement si la colonne existe
+                                        if 'statut' not in missing_cols:
+                                            update_data["statut"] = statut
+                                            
+                                            # Ajouter les champs spécifiques aux anciens étudiants si la colonne existe
+                                            if statut == "Ancien étudiant":
+                                                if 'profession' not in missing_cols:
+                                                    update_data["profession"] = profession
                                         
                                         response = conn.table('etudiants').update(update_data).eq("email", student['email']).execute()
                                         st.success("Données mises à jour avec succès !")
