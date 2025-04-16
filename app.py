@@ -379,22 +379,57 @@ def show_statistics(df):
         st.plotly_chart(fig_uni, use_container_width=True)
     
     with col2:
-        st.markdown('<div class="section-title">RÉPARTITION PAR VILLE</div>', unsafe_allow_html=True)
-        ville_counts = df['ville'].value_counts().reset_index()
-        ville_counts.columns = ['ville', 'count']
+        st.markdown('<div class="section-title">RÉPARTITION PAR FACULTÉ</div>', unsafe_allow_html=True)
+        # Filtrer pour supprimer les facultés vides ou nulles
+        df_faculte = df.copy()
+        df_faculte = df_faculte[df_faculte['faculte'].notna() & (df_faculte['faculte'] != "") & (df_faculte['faculte'] != "nan")]
         
-        fig_ville = px.bar(ville_counts,
-                          x='ville',
+        # Normaliser les noms de facultés
+        faculte_mapping = {
+            'économie': 'Économie',
+            'economie': 'Économie',
+            'Économie': 'Économie',
+            'Economie': 'Économie',
+            'Faculty of Economics': 'Économie',
+            'Faculté d\'économie': 'Économie',
+            'médecine': 'Médecine',
+            'medecine': 'Médecine',
+            'Médecine': 'Médecine',
+            'Medecine': 'Médecine',
+            'médical': 'Médecine',
+            'medical': 'Médecine',
+            'Faculty of Medicine': 'Médecine',
+            'informatique': 'Informatique',
+            'Informatique': 'Informatique',
+            'Computer Science': 'Informatique',
+            'IT': 'Informatique',
+            'ingénierie': 'Ingénierie',
+            'ingenierie': 'Ingénierie',
+            'Ingénierie': 'Ingénierie',
+            'Ingenierie': 'Ingénierie',
+            'Engineering': 'Ingénierie',
+            'droit': 'Droit',
+            'Droit': 'Droit',
+            'Law': 'Droit'
+        }
+        df_faculte['faculte'] = df_faculte['faculte'].str.strip()
+        df_faculte['faculte'] = df_faculte['faculte'].replace(faculte_mapping, regex=True)
+        
+        faculte_counts = df_faculte['faculte'].value_counts().reset_index()
+        faculte_counts.columns = ['faculte', 'count']
+        
+        fig_faculte = px.bar(faculte_counts,
+                          x='faculte',
                           y='count',
                           color_discrete_sequence=['#7FB3D5'])
-        fig_ville.update_layout(
+        fig_faculte.update_layout(
             title_text='',
             xaxis_title='',
             yaxis_title='Nombre d\'Ivoiriens',
             showlegend=False,
             margin=dict(l=20, r=20, t=20, b=20)
         )
-        st.plotly_chart(fig_ville, use_container_width=True)
+        st.plotly_chart(fig_faculte, use_container_width=True)
     
     # Statistiques détaillées par faculté
     st.markdown('<div class="section-title">STATISTIQUES PAR FACULTÉ</div>', unsafe_allow_html=True)
