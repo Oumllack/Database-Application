@@ -271,6 +271,7 @@ def update_database(df, conn):
                         "email": row['email'],
                         "nom_complet": row['nom_complet'],
                         "genre": row['genre'],
+                        "statut": "Étudiant actuel",  # Statut par défaut
                         "universite": row['universite'],
                         "faculte": row['faculte'],
                         "niveau_etude": row['niveau_etude'],
@@ -538,7 +539,8 @@ def main():
                 'universite': 'Université',
                 'niveau_etude': 'Niveau d\'Étude',
                 'ville': 'Ville',
-                'date_inscription': 'Date'
+                'date_inscription': 'Date',
+                'statut': 'Statut'
             }
             
             sort_column = st.selectbox(
@@ -553,18 +555,46 @@ def main():
                 ascending=(sort_order == "Croissant")
             )
             
+            # Ajouter un filtre pour le statut
+            if 'statut' in df.columns:
+                statut_filter = st.sidebar.multiselect(
+                    "Filtrer par statut",
+                    options=df['statut'].unique() if not df['statut'].isna().all() else ["Étudiant actuel", "Ancien étudiant"],
+                    default=df['statut'].unique() if not df['statut'].isna().all() else ["Étudiant actuel", "Ancien étudiant"]
+                )
+                
+                if statut_filter:
+                    df_sorted = df_sorted[df_sorted['statut'].isin(statut_filter)]
+            
             # Sélectionner uniquement les colonnes à afficher
             columns_to_display = [
-                'nom_complet', 'email', 'genre', 'universite', 'faculte', 
-                'niveau_etude', 'telephone', 'adresse', 'ville', 'date_inscription'
+                'nom_complet', 'email', 'genre', 'statut', 'universite', 'faculte', 
+                'niveau_etude', 'annee_fin', 'profession', 'telephone', 'ville', 'date_inscription'
             ]
+            
+            # Filtrer les colonnes qui existent réellement dans le DataFrame
+            columns_to_display = [col for col in columns_to_display if col in df_sorted.columns]
             df_display = df_sorted[columns_to_display]
             
-            # Renommer les colonnes pour l'affichage
-            df_display.columns = [
-                'Nom Complet', 'Email', 'Genre', 'Université', 'Faculté',
-                'Niveau d\'Étude', 'Téléphone', 'Adresse', 'Ville', 'Date'
-            ]
+            # Créer une correspondance entre les noms de colonnes et leurs titres d'affichage
+            column_titles = {
+                'nom_complet': 'Nom Complet',
+                'email': 'Email',
+                'genre': 'Genre',
+                'statut': 'Statut',
+                'universite': 'Université',
+                'faculte': 'Faculté',
+                'niveau_etude': 'Niveau d\'Étude',
+                'annee_fin': 'Année de fin',
+                'profession': 'Profession',
+                'telephone': 'Téléphone',
+                'adresse': 'Adresse',
+                'ville': 'Ville',
+                'date_inscription': 'Date'
+            }
+            
+            # Renommer les colonnes pour l'affichage en utilisant uniquement les colonnes présentes
+            df_display.columns = [column_titles[col] for col in columns_to_display]
             
             st.dataframe(
                 df_display.style.set_properties(**{
@@ -581,15 +611,27 @@ def main():
             st.sidebar.write(f"Nombre total d'étudiants : {len(df)}")
     
     elif menu == "Ajouter un étudiant":
-        st.subheader("➕ Ajouter un nouvel étudiant")
+        st.subheader("➕ Ajouter un nouvel étudiant ou ancien étudiant")
         
         with st.form("add_student_form"):
             nom_complet = st.text_input("Nom complet*")
             email = st.text_input("Email*")
             genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"])
-            universite = st.text_input("Université*")
-            faculte = st.text_input("Faculté*")
-            niveau_etude = st.selectbox("Niveau d'étude*", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
+            
+            # Nouveau champ pour distinguer étudiants actuels et anciens
+            statut = st.selectbox("Statut*", ["Étudiant actuel", "Ancien étudiant"])
+            
+            if statut == "Étudiant actuel":
+                universite = st.text_input("Université*")
+                faculte = st.text_input("Faculté*")
+                niveau_etude = st.selectbox("Niveau d'étude*", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
+            else:
+                universite = st.text_input("Dernière université fréquentée*")
+                faculte = st.text_input("Dernière faculté*")
+                niveau_etude = st.selectbox("Dernier niveau d'étude*", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
+                annee_fin = st.text_input("Année de fin d'études*")
+                profession = st.text_input("Profession actuelle")
+            
             telephone = st.text_input("Téléphone")
             adresse = st.text_input("Adresse")
             ville = st.text_input("Ville*")
@@ -597,8 +639,12 @@ def main():
             submitted = st.form_submit_button("Ajouter")
             
             if submitted:
-                if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
+                if not nom_complet or not email or not ville:
                     st.error("Veuillez remplir tous les champs obligatoires (*)")
+                elif statut == "Étudiant actuel" and (not universite or not faculte or not niveau_etude):
+                    st.error("Veuillez remplir tous les champs obligatoires pour les étudiants actuels (*)")
+                elif statut == "Ancien étudiant" and (not universite or not faculte or not niveau_etude or not annee_fin):
+                    st.error("Veuillez remplir tous les champs obligatoires pour les anciens étudiants (*)")
                 else:
                     conn = connect_to_database()
                     if conn:
@@ -607,10 +653,12 @@ def main():
                             ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
                             niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
                             
-                            response = conn.table('etudiants').insert({
+                            # Préparer les données en fonction du statut
+                            student_data = {
                                 "nom_complet": nom_complet,
                                 "email": email,
                                 "genre": genre,
+                                "statut": statut,
                                 "universite": universite,
                                 "faculte": faculte,
                                 "niveau_etude": niveau_etude,
@@ -620,8 +668,15 @@ def main():
                                 "date_creation": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 "date_inscription": datetime.now().strftime('%Y-%m-%d')
-                            }).execute()
-                            st.success("Étudiant ajouté avec succès !")
+                            }
+                            
+                            # Ajouter les champs spécifiques aux anciens étudiants
+                            if statut == "Ancien étudiant":
+                                student_data["annee_fin"] = annee_fin
+                                student_data["profession"] = profession
+                            
+                            response = conn.table('etudiants').insert(student_data).execute()
+                            st.success("Données enregistrées avec succès !")
                             load_data(force=True)  # Recharger les données
                         except Exception as e:
                             st.error(f"Erreur lors de l'ajout: {e}")
@@ -655,13 +710,32 @@ def main():
                             nom_complet = st.text_input("Nom complet*", value=student['nom_complet'])
                             email = st.text_input("Email*", value=student['email'])
                             genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"], index=["Homme", "Femme", "Autre"].index(student['genre']))
-                            universite = st.text_input("Université*", value=student['universite'])
-                            faculte = st.text_input("Faculté*", value=student['faculte'])
-                            niveau_etude = st.selectbox(
-                                "Niveau d'étude*", 
-                                ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"],
-                                index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
-                            )
+                            
+                            # Récupération du statut (ou valeur par défaut si le champ n'existe pas)
+                            default_statut = student.get('statut', 'Étudiant actuel')
+                            statut = st.selectbox("Statut*", ["Étudiant actuel", "Ancien étudiant"], 
+                                                 index=["Étudiant actuel", "Ancien étudiant"].index(default_statut) if default_statut in ["Étudiant actuel", "Ancien étudiant"] else 0)
+                            
+                            if statut == "Étudiant actuel":
+                                universite = st.text_input("Université*", value=student['universite'])
+                                faculte = st.text_input("Faculté*", value=student['faculte'])
+                                niveau_etude = st.selectbox(
+                                    "Niveau d'étude*", 
+                                    ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"],
+                                    index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
+                                )
+                            else:
+                                universite = st.text_input("Dernière université fréquentée*", value=student['universite'])
+                                faculte = st.text_input("Dernière faculté*", value=student['faculte'])
+                                niveau_etude = st.selectbox(
+                                    "Dernier niveau d'étude*", 
+                                    ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"],
+                                    index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
+                                )
+                                # Récupération des valeurs pour les anciens étudiants (ou valeur vide si non présente)
+                                annee_fin = st.text_input("Année de fin d'études*", value=student.get('annee_fin', ''))
+                                profession = st.text_input("Profession actuelle", value=student.get('profession', ''))
+                            
                             telephone = st.text_input("Téléphone", value=student['telephone'])
                             adresse = st.text_input("Adresse", value=student['adresse'])
                             ville = st.text_input("Ville*", value=student['ville'])
@@ -669,18 +743,24 @@ def main():
                             submitted = st.form_submit_button("Mettre à jour")
                             
                             if submitted:
-                                if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
+                                if not nom_complet or not email or not ville:
                                     st.error("Veuillez remplir tous les champs obligatoires (*)")
+                                elif statut == "Étudiant actuel" and (not universite or not faculte or not niveau_etude):
+                                    st.error("Veuillez remplir tous les champs obligatoires pour les étudiants actuels (*)")
+                                elif statut == "Ancien étudiant" and (not universite or not faculte or not niveau_etude or not annee_fin):
+                                    st.error("Veuillez remplir tous les champs obligatoires pour les anciens étudiants (*)")
                                 else:
                                     try:
                                         # Nettoyage des données avant mise à jour
                                         ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
                                         niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
                                         
-                                        response = conn.table('etudiants').update({
+                                        # Préparer les données de base
+                                        update_data = {
                                             "nom_complet": nom_complet,
                                             "email": email,
                                             "genre": genre,
+                                            "statut": statut,
                                             "universite": universite,
                                             "faculte": faculte,
                                             "niveau_etude": niveau_etude,
@@ -688,8 +768,15 @@ def main():
                                             "adresse": adresse,
                                             "ville": ville,
                                             "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                                        }).eq("email", student['email']).execute()
-                                        st.success("Étudiant mis à jour avec succès !")
+                                        }
+                                        
+                                        # Ajouter les champs spécifiques aux anciens étudiants
+                                        if statut == "Ancien étudiant":
+                                            update_data["annee_fin"] = annee_fin
+                                            update_data["profession"] = profession
+                                        
+                                        response = conn.table('etudiants').update(update_data).eq("email", student['email']).execute()
+                                        st.success("Données mises à jour avec succès !")
                                         load_data(force=True)  # Recharger les données
                                     except Exception as e:
                                         st.error(f"Erreur lors de la mise à jour: {e}")
