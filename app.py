@@ -623,8 +623,8 @@ def main():
         st.subheader("➕ Ajouter un nouvel étudiant")
         
         with st.form("add_student_form"):
-            nom_complet = st.text_input("Nom complet*")
-            email = st.text_input("Email*")
+            nom_complet = st.text_input("Nom complet* (obligatoire)")
+            email = st.text_input("Email* (obligatoire)")
             genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"])
             
             # Ajouter le champ statut si la colonne existe
@@ -633,22 +633,22 @@ def main():
             else:
                 statut = "Étudiant actuel"  # Valeur par défaut
                 
-            universite = st.text_input("Université*")
-            faculte = st.text_input("Faculté*")
-            niveau_etude = st.selectbox("Niveau d'étude*", ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
+            universite = st.text_input("Université")
+            faculte = st.text_input("Faculté")
+            niveau_etude = st.selectbox("Niveau d'étude", ["", "Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"])
             
             # Ajouter le champ profession pour les anciens étudiants si les colonnes existent
             if statut == "Ancien étudiant" and 'profession' in st.session_state.data.columns if st.session_state.data is not None else False:
-                profession = st.text_input("Profession actuelle*")
+                profession = st.text_input("Profession actuelle* (obligatoire pour les anciens étudiants)")
             
             telephone = st.text_input("Téléphone")
             adresse = st.text_input("Adresse")
-            ville = st.text_input("Ville*")
+            ville = st.text_input("Ville* (obligatoire)")
             
             submitted = st.form_submit_button("Ajouter")
             
             if submitted:
-                if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
+                if not nom_complet or not email or not ville:
                     st.error("Veuillez remplir tous les champs obligatoires (*)")
                 elif statut == "Ancien étudiant" and 'profession' in st.session_state.data.columns and not profession:
                     st.error("Veuillez remplir le champ profession pour les anciens étudiants")
@@ -657,19 +657,21 @@ def main():
                     if conn:
                         try:
                             # Nettoyage des données avant insertion
-                            ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
-                            niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
+                            if ville:
+                                ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
+                            if niveau_etude:
+                                niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
                             
                             # Préparer les données de base
                             student_data = {
                                 "nom_complet": nom_complet,
                                 "email": email,
                                 "genre": genre,
-                                "universite": universite,
-                                "faculte": faculte,
-                                "niveau_etude": niveau_etude,
-                                "telephone": telephone,
-                                "adresse": adresse,
+                                "universite": universite or "",
+                                "faculte": faculte or "",
+                                "niveau_etude": niveau_etude or "",
+                                "telephone": telephone or "",
+                                "adresse": adresse or "",
                                 "ville": ville,
                                 "date_creation": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
                                 "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -716,8 +718,8 @@ def main():
                     
                     if action == "Modifier":
                         with st.form("edit_student_form"):
-                            nom_complet = st.text_input("Nom complet*", value=student['nom_complet'])
-                            email = st.text_input("Email*", value=student['email'])
+                            nom_complet = st.text_input("Nom complet* (obligatoire)", value=student['nom_complet'])
+                            email = st.text_input("Email* (obligatoire)", value=student['email'])
                             genre = st.selectbox("Genre*", ["Homme", "Femme", "Autre"], index=["Homme", "Femme", "Autre"].index(student['genre']))
                             
                             # Ajouter le champ statut si la colonne existe
@@ -728,45 +730,54 @@ def main():
                             else:
                                 statut = "Étudiant actuel"  # Valeur par défaut
                                 
-                            universite = st.text_input("Université*", value=student['universite'])
-                            faculte = st.text_input("Faculté*", value=student['faculte'])
+                            universite = st.text_input("Université", value=student['universite'])
+                            faculte = st.text_input("Faculté", value=student['faculte'])
+                            
+                            # Créer une liste de niveaux d'étude avec option vide
+                            niveau_options = ["", "Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"]
+                            # Trouver l'index du niveau actuel ou 0 si non trouvé
+                            current_niveau = student['niveau_etude'] if student['niveau_etude'] else ""
+                            niveau_index = niveau_options.index(current_niveau) if current_niveau in niveau_options else 0
+                            
                             niveau_etude = st.selectbox(
-                                "Niveau d'étude*", 
-                                ["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"],
-                                index=["Bachelor", "Master", "Doctorat", "Spécialiste", "Année de langue"].index(student['niveau_etude'])
+                                "Niveau d'étude", 
+                                niveau_options,
+                                index=niveau_index
                             )
                             
                             # Ajouter le champ profession pour les anciens étudiants si la colonne existe
                             if statut == "Ancien étudiant" and 'profession' in df.columns:
-                                profession = st.text_input("Profession actuelle*", value=student.get('profession', ''))
+                                profession = st.text_input("Profession actuelle* (obligatoire pour les anciens étudiants)", value=student.get('profession', ''))
                             
                             telephone = st.text_input("Téléphone", value=student['telephone'])
                             adresse = st.text_input("Adresse", value=student['adresse'])
-                            ville = st.text_input("Ville*", value=student['ville'])
+                            ville = st.text_input("Ville* (obligatoire)", value=student['ville'])
                             
                             submitted = st.form_submit_button("Mettre à jour")
                             
                             if submitted:
-                                if not nom_complet or not email or not universite or not faculte or not niveau_etude or not ville:
+                                if not nom_complet or not email or not ville:
                                     st.error("Veuillez remplir tous les champs obligatoires (*)")
                                 elif statut == "Ancien étudiant" and 'profession' in df.columns and not profession:
                                     st.error("Veuillez remplir le champ profession pour les anciens étudiants")
                                 else:
                                     try:
                                         # Nettoyage des données avant mise à jour
-                                        ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
-                                        niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
+                                        if ville:
+                                            ville = clean_data(pd.DataFrame([{'ville': ville}]))['ville'][0]
+                                        if niveau_etude:
+                                            niveau_etude = clean_data(pd.DataFrame([{'niveau_etude': niveau_etude}]))['niveau_etude'][0]
                                         
                                         # Préparer les données de base
                                         update_data = {
                                             "nom_complet": nom_complet,
                                             "email": email,
                                             "genre": genre,
-                                            "universite": universite,
-                                            "faculte": faculte,
-                                            "niveau_etude": niveau_etude,
-                                            "telephone": telephone,
-                                            "adresse": adresse,
+                                            "universite": universite or "",
+                                            "faculte": faculte or "",
+                                            "niveau_etude": niveau_etude or "",
+                                            "telephone": telephone or "",
+                                            "adresse": adresse or "",
                                             "ville": ville,
                                             "date_modification": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                                         }
