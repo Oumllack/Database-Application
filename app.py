@@ -510,10 +510,12 @@ def main():
                 default=df['genre'].unique()
             )
             
+            # Filtrer les valeurs vides ou nulles pour le filtre université
+            uni_options = df[df['universite'].notna() & (df['universite'] != "") & (df['universite'] != "nan")]['universite'].unique()
             uni_filter = st.sidebar.multiselect(
                 "Filtrer par université",
-                options=df['universite'].unique(),
-                default=df['universite'].unique()
+                options=uni_options,
+                default=uni_options
             )
             
             niveau_filter = st.sidebar.multiselect(
