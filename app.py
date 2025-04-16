@@ -622,7 +622,7 @@ def main():
                 st.markdown("""
                 <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <p style="font-size: 1em; font-style: italic; margin: 0;">
-                        <strong>Note:</strong> Les noms avec un astérisque (*) représentent les Ivoiriens vivant en Sibérie qui ne sont plus étudiants
+                        <strong>Note:</strong> Les noms avec un astérisque (*) représentent les Ivoiriens vivant à Tomsk qui ne sont plus étudiants
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
