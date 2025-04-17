@@ -20,7 +20,7 @@ import streamlit.components.v1 as components
 
 # Configuration de la page
 st.set_page_config(
-    page_title="Recensement des Ivoiriens Résidents à Tomsk",
+    page_title="Recensement des Ivoiriens Résidents en Sibérie",
     page_icon="🇨🇮",
     layout="wide"
 )
@@ -483,7 +483,7 @@ def show_statistics(df):
     }), use_container_width=True)
 
 def main():
-    st.markdown('<div class="main-title">RECENSEMENT DES IVOIRIENS RÉSIDENTS À TOMSK</div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-title">RECENSEMENT DES IVOIRIENS RÉSIDENTS EN SIBÉRIE</div>', unsafe_allow_html=True)
     
     # Initialisation de la session
     if 'last_update' not in st.session_state:
@@ -510,7 +510,7 @@ def main():
     # Menu latéral
     menu = st.sidebar.selectbox(
         "Menu",
-        ["Visualiser les données", "Ajouter un étudiant", "Modifier/Supprimer", "Importation"]
+        ["Visualiser les données", "Ajouter une personne", "Modifier/Supprimer", "Importation"]
     )
     
     # Bouton d'actualisation manuelle
@@ -590,7 +590,7 @@ def main():
             show_statistics(df)
             
             # Affichage des données
-            st.markdown('<div class="section-title">LISTE DES ÉTUDIANTS</div>', unsafe_allow_html=True)
+            st.markdown('<div class="section-title">LISTE DES IVOIRIENS</div>', unsafe_allow_html=True)
             
             # Options de tri
             sort_options = {
@@ -652,12 +652,12 @@ def main():
                 hide_index=True
             )
             
-            # Ajouter la légende pour les anciens étudiants avec un style plus visible
+            # Ajouter la légende pour les anciens étudiants
             if 'statut' in df.columns and any(df_sorted['statut'] == 'Ancien étudiant'):
                 st.markdown("""
                 <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <p style="font-size: 1em; font-style: italic; margin: 0;">
-                        <strong>Note:</strong> Les noms avec un astérisque (*) représentent les Ivoiriens vivant à Tomsk qui ne sont plus étudiants
+                        <strong>Note:</strong> Les noms avec un astérisque (*) représentent les Ivoiriens vivant en Sibérie qui ne sont plus étudiants
                     </p>
                 </div>
                 """, unsafe_allow_html=True)
@@ -667,8 +667,8 @@ def main():
             st.sidebar.write(f"Nombre d'étudiants affichés : {len(df_display)}")
             st.sidebar.write(f"Nombre total d'étudiants : {len(df)}")
     
-    elif menu == "Ajouter un étudiant":
-        st.subheader("➕ Ajouter un nouvel étudiant")
+    elif menu == "Ajouter une personne":
+        st.subheader("➕ Ajouter une nouvelle personne")
         
         with st.form("add_student_form"):
             nom_complet = st.text_input("Nom complet* (obligatoire)")
