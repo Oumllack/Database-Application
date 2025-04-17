@@ -134,6 +134,11 @@ def abbreviate_university(name):
         "Université Médicale d'Etat de Sibérie": "СибГМУ",
         "Université Médicale d'Etat de Novossibirsk": "НГМУ",
         "Université d'Etat de Novossibirsk d'Economie et de Gestion": "НГУЭУ",
+        "Université d'État de Novossibirsk d'Économie et de Gestion": "НГУЭУ",
+        "Université d'Etat de Novossibirsk d'économie et de gestion": "НГУЭУ",
+        "Université d'Etat de Novossibirsk": "НГУЭУ",
+        "Université de Novossibirsk d'Economie et de Gestion": "НГУЭУ",
+        "НГУЭУ": "НГУЭУ",
         "Université d'Etat d'Architecture et de Construction de Tomsk": "ТГАСУ",
         "Université Médicale d'Etat de Kemerovo": "КемГМУ",
         "Universite d'Etat de Tomsk": "ТГУ",
@@ -148,6 +153,9 @@ def abbreviate_university(name):
     for full_name, abbrev in abbreviations.items():
         if full_name.lower() == name.lower():
             return abbrev
+        # Vérification supplémentaire pour НГУЭУ - si le nom contient "Novossibirsk" et "Economie"
+        if abbrev == "НГУЭУ" and "novossibirsk" in name.lower() and ("economie" in name.lower() or "économie" in name.lower()):
+            return "НГУЭУ"
     return name
 
 def clean_data(df):
