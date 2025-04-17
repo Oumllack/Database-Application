@@ -443,6 +443,9 @@ def show_statistics(df):
     fac_stats['Pourcentage d\'hommes'] = (fac_stats['Nombre d\'hommes'] / fac_stats['Nombre total'] * 100).round(1)
     fac_stats['Pourcentage de femmes'] = (fac_stats['Nombre de femmes'] / fac_stats['Nombre total'] * 100).round(1)
     
+    # Renommer l'index pour capitaliser "faculte" en "Faculté"
+    fac_stats.index.name = 'Faculté'
+    
     st.dataframe(fac_stats.style.format({
         'Pourcentage d\'hommes': '{:.1f}%',
         'Pourcentage de femmes': '{:.1f}%'
