@@ -132,6 +132,7 @@ def abbreviate_university(name):
         "Université d'Etat de Tomsk des Systemes de Controle et de Radioelectronique": "ТУСУР",
         "Université d'Etat de Tomsk des Systèmes de Contrôle et de Radioélectronique": "ТУСУР",
         "Université Médicale d'Etat de Sibérie": "СибГМУ",
+        "Université Médicale d'Etat de Novossibirsk": "НГМУ",
         "Université d'Etat d'Architecture et de Construction de Tomsk": "ТГАСУ",
         "Université Médicale d'Etat de Kemerovo": "КемГМУ",
         "Universite d'Etat de Tomsk": "ТГУ",
